@@ -11,7 +11,13 @@ import dev.toka.protect.command.ProtectCommand;
 import dev.toka.protect.flag.FlagTable;
 import dev.toka.protect.flag.Rules;
 import dev.toka.protect.link.Places;
+import dev.toka.protect.listener.Inspector;
+import dev.toka.protect.listener.LogListener;
 import dev.toka.protect.listener.WorldListener;
+import dev.toka.protect.log.LogRecord;
+import dev.toka.protect.log.LogStore;
+import dev.toka.protect.log.LogView;
+import dev.toka.protect.log.LogWriter;
 import dev.toka.protect.storage.FlagRepository;
 import dev.toka.storage.Backend;
 import dev.toka.storage.DocumentStore;
@@ -40,6 +46,9 @@ public final class Main extends PluginBase implements Listener {
     private Mode mode = Mode.STANDBY;
     private Breaker breaker;
     private Set<Feature> enabled = Set.of();
+    private LogView logView;
+    private LogWriter logWriter;
+    private Inspector inspector;
     private final Map<String, Messages> languages = new HashMap<>();
 
     @Override public void onEnable() {
@@ -73,6 +82,7 @@ public final class Main extends PluginBase implements Listener {
             } else {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
+            if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
             command = new ProtectCommand(this);
             var commands = getServer().getCommandMap();
             var existing = commands.getCommand("protect");
@@ -89,6 +99,39 @@ public final class Main extends PluginBase implements Listener {
         }
     }
 
+    /** Opens the log database and starts writing. A failure here only turns the log off; the other features go on. */
+    private void startLog(cn.nukkit.utils.Config config, Path pluginDirectory) {
+        try {
+            Path file = pluginDirectory.resolve(config.getString("log.file", "log/blocks.db")).normalize();
+            if (!file.startsWith(pluginDirectory)) throw new IllegalArgumentException("log.file must remain inside the plugin data folder");
+            LogStore logStore = new LogStore(file);
+            long retention = config.getInt("log.retention-days", 90) * 86_400_000L;
+            long maxRows = config.getLong("log.max-rows", 3_000_000L);
+            logWriter = new LogWriter(new LogWriter.Sink() {
+                public void write(List<LogRecord> batch) throws Exception { logStore.insert(batch); }
+                public void maintain() throws Exception {
+                    long removed = logStore.purge(System.currentTimeMillis() - retention, maxRows);
+                    if (removed > 0) getLogger().info("方塊紀錄已清除 " + removed + " 筆過期或超量的舊紀錄。");
+                }
+            }, config.getInt("log.queue-size", 20_000), config.getInt("log.batch-size", 500), config.getInt("log.flush-seconds", 2) * 1000L,
+                    config.getInt("log.maintenance-minutes", 30) * 60_000L, error -> {
+                if (breaker.failed(Feature.RECORD, error)) getLogger().error("方塊紀錄寫入連續失敗，已自動停用；其他保護功能不受影響。", error);
+                else getLogger().warning("方塊紀錄寫入失敗，這一批已丟棄：" + error);
+            });
+            logView = new LogView(this, logStore, config.getInt("log.query-rows", 300), config.getInt("log.collapse-seconds", 60) * 1000L);
+            inspector = new Inspector(logView, null);
+            getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000)), this);
+            getServer().getPluginManager().registerEvents(inspector, this);
+            getLogger().info("方塊紀錄啟用：保留 " + config.getInt("log.retention-days", 90) + " 天、最多 " + maxRows + " 筆。");
+        } catch (Exception failure) {
+            getLogger().error("方塊紀錄無法啟動，已關閉；其他保護功能照常。", failure);
+            EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
+            without.addAll(enabled);
+            without.remove(Feature.RECORD);
+            enabled = Collections.unmodifiableSet(without);
+        }
+    }
+
     /** Regions and claims come from other plugins, which may start after this one or be reloaded. */
     @EventHandler public void onPluginEnabled(PluginEnableEvent event) {
         String name = event.getPlugin().getName();
@@ -102,6 +145,11 @@ public final class Main extends PluginBase implements Listener {
             command.unregister(commands);
         }
         if (instance == this) instance = null;
+        if (logWriter != null) logWriter.close();
+        if (logView != null) {
+            logView.close();
+            try { logView.store().close(); } catch (Exception error) { getLogger().error("關閉方塊紀錄資料庫失敗。", error); }
+        }
         if (store != null) try { store.close(); } catch (IOException error) { getLogger().error("關閉保護儲存庫失敗。", error); }
     }
 
@@ -114,6 +162,9 @@ public final class Main extends PluginBase implements Listener {
         return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
     }
 
+    public LogView logView() { return logView; }
+    public Inspector inspector() { return inspector; }
+    public LogWriter logWriter() { return logWriter; }
     public Mode mode() { return mode; }
     public Breaker breaker() { return breaker; }
     /** The features switched on by the mode and the configuration; one that has tripped is still listed here. */

@@ -6,6 +6,7 @@ language: zh-TW
 mode: standby
 # 各功能可單獨關閉（minimal 時 hazards 本來就不運作）。
 features:
+  record: true
   explosions: true
   farmland: true
   pvp: true
@@ -19,3 +20,20 @@ storage:
   backend: SQLITE
   schema-version: 1
   directory: storage
+# 方塊紀錄（record 功能）。只記有明確責任人的變更：玩家放置、破壞、倒水舀水、點火，以及爆炸（含已知的來源）。
+log:
+  file: log/blocks.db
+  # 保留天數與筆數上限，先到者先清，從最舊開始。
+  retention-days: 90
+  max-rows: 3000000
+  # 背景寫入：佇列滿了就丟棄並計數，不會拖慢伺服器。
+  queue-size: 20000
+  batch-size: 500
+  flush-seconds: 2
+  # 清除過期紀錄的間隔。
+  maintenance-minutes: 30
+  # 單次爆炸最多記錄的方塊數。
+  explosion-block-limit: 2000
+  # 查詢最多讀取的原始筆數、相同動作合併成一行的最大間隔。
+  query-rows: 300
+  collapse-seconds: 60

@@ -31,4 +31,9 @@ public class LangFileTest {
         var keys = keys("zh-TW.yml");
         for (Flag flag : Flag.values()) assertTrue(flag.id(), keys.contains("flag." + flag.id()));
     }
+
+    @Test public void everyLoggedActionHasAWord() throws Exception {
+        var keys = keys("zh-TW.yml");
+        for (dev.toka.protect.log.Action action : dev.toka.protect.log.Action.values()) assertTrue(action.name(), keys.contains(action.langKey()));
+    }
 }

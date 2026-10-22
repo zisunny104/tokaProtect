@@ -11,7 +11,9 @@ public enum Feature {
     PVP("pvp", false),
     /** Water, lava, fire and pistons outside claims. Needs to know where claims are, so it only runs in full mode. */
     HAZARDS("hazards", true),
-    PISTONS("pistons", false);
+    PISTONS("pistons", false),
+    /** Writing block changes to the log. Needs no other plugin. */
+    RECORD("record", false);
 
     private final String id;
     private final boolean needsClaims;
