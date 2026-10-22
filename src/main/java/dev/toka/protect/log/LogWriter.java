@@ -11,18 +11,19 @@ import java.util.function.Consumer;
 /**
  * Takes records from the server thread without ever waiting and writes them in batches on its own thread. When the queue is
  * full the record is dropped and counted: losing a log line is better than slowing the server. A failed write drops that
- * batch and is reported, so a broken disk cannot make the queue grow without bound.
+ * batch and is reported, so a broken disk cannot make the queue grow without bound. Used for both the block log and the
+ * command audit.
  */
-public final class LogWriter implements AutoCloseable {
+public final class LogWriter<T> implements AutoCloseable {
     /** Where batches go; the database in the server, a fake in tests. */
-    public interface Sink {
-        void write(List<LogRecord> batch) throws Exception;
+    public interface Sink<T> {
+        void write(List<T> batch) throws Exception;
         /** Housekeeping, called now and then between batches. */
         void maintain() throws Exception;
     }
 
-    private final BlockingQueue<LogRecord> queue;
-    private final Sink sink;
+    private final BlockingQueue<T> queue;
+    private final Sink<T> sink;
     private final long flushMillis;
     private final long maintainMillis;
     private final int batchSize;
@@ -33,7 +34,7 @@ public final class LogWriter implements AutoCloseable {
     private volatile boolean running = true;
     private final Thread thread;
 
-    public LogWriter(Sink sink, int queueSize, int batchSize, long flushMillis, long maintainMillis, Consumer<Throwable> onError) {
+    public LogWriter(String name, Sink<T> sink, int queueSize, int batchSize, long flushMillis, long maintainMillis, Consumer<Throwable> onError) {
         if (queueSize < 1 || batchSize < 1 || flushMillis < 1 || maintainMillis < 1) throw new IllegalArgumentException("sizes must be positive");
         this.sink = sink;
         this.queue = new ArrayBlockingQueue<>(queueSize);
@@ -41,13 +42,13 @@ public final class LogWriter implements AutoCloseable {
         this.flushMillis = flushMillis;
         this.maintainMillis = maintainMillis;
         this.onError = onError;
-        this.thread = new Thread(this::run, "tokaProtect-log");
+        this.thread = new Thread(this::run, "tokaProtect-" + name);
         this.thread.setDaemon(true);
         this.thread.start();
     }
 
     /** Never blocks. Returns false when the record was dropped. */
-    public boolean offer(LogRecord record) {
+    public boolean offer(T record) {
         if (queue.offer(record)) return true;
         dropped.incrementAndGet();
         return false;
@@ -60,10 +61,10 @@ public final class LogWriter implements AutoCloseable {
 
     private void run() {
         long lastMaintenance = System.currentTimeMillis();
-        List<LogRecord> batch = new ArrayList<>(batchSize);
+        List<T> batch = new ArrayList<>(batchSize);
         while (running || !queue.isEmpty()) {
             try {
-                LogRecord first = queue.poll(flushMillis, TimeUnit.MILLISECONDS);
+                T first = queue.poll(flushMillis, TimeUnit.MILLISECONDS);
                 if (first != null) {
                     batch.add(first);
                     queue.drainTo(batch, batchSize - 1);
@@ -80,7 +81,7 @@ public final class LogWriter implements AutoCloseable {
         }
     }
 
-    private void flush(List<LogRecord> batch) {
+    private void flush(List<T> batch) {
         try {
             sink.write(List.copyOf(batch));
             written.addAndGet(batch.size());
@@ -92,7 +93,7 @@ public final class LogWriter implements AutoCloseable {
         }
     }
 
-    /** Stops accepting nothing new to wait for, writes what is queued, and ends the thread. */
+    /** Writes what is queued and ends the thread. */
     @Override public void close() {
         running = false;
         thread.interrupt();

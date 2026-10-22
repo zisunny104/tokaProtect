@@ -15,7 +15,7 @@ public class LogWriterTest {
         return LogRecord.byPlayer(i, UUID.randomUUID(), "p", Action.PLACE, "w", i, 64, 0, 1, 0);
     }
 
-    private static final class Collecting implements LogWriter.Sink {
+    private static final class Collecting implements LogWriter.Sink<LogRecord> {
         final List<LogRecord> all = Collections.synchronizedList(new ArrayList<>());
         final List<Integer> batchSizes = Collections.synchronizedList(new ArrayList<>());
         final AtomicInteger maintenance = new AtomicInteger();
@@ -30,7 +30,7 @@ public class LogWriterTest {
 
     @Test public void everythingQueuedIsWrittenByCloseAndInBatches() {
         var sink = new Collecting();
-        var writer = new LogWriter(sink, 1000, 50, 20, 60_000, error -> fail(error.toString()));
+        var writer = new LogWriter<LogRecord>("t", sink, 1000, 50, 20, 60_000, error -> fail(error.toString()));
         for (int i = 0; i < 200; i++) assertTrue(writer.offer(record(i)));
         writer.close();
         assertEquals(200, sink.all.size());
@@ -42,11 +42,11 @@ public class LogWriterTest {
     @Test public void aFullQueueDropsRecordsInsteadOfWaiting() throws Exception {
         var stalled = new CountDownLatch(1);
         var release = new CountDownLatch(1);
-        var sink = new LogWriter.Sink() {
+        var sink = new LogWriter.Sink<LogRecord>() {
             public void write(List<LogRecord> batch) throws Exception { stalled.countDown(); release.await(5, TimeUnit.SECONDS); }
             public void maintain() { }
         };
-        var writer = new LogWriter(sink, 5, 1, 5, 60_000, error -> { });
+        var writer = new LogWriter<LogRecord>("t", sink, 5, 1, 5, 60_000, error -> { });
         writer.offer(record(0));
         assertTrue(stalled.await(5, TimeUnit.SECONDS));
         int accepted = 0;
@@ -60,7 +60,7 @@ public class LogWriterTest {
     @Test public void aFailedWriteIsReportedAndLaterBatchesStillGo() throws Exception {
         var sink = new Collecting();
         var errors = new AtomicInteger();
-        var writer = new LogWriter(sink, 100, 10, 10, 60_000, error -> errors.incrementAndGet());
+        var writer = new LogWriter<LogRecord>("t", sink, 100, 10, 10, 60_000, error -> errors.incrementAndGet());
         sink.fail = true;
         writer.offer(record(1));
         long deadline = System.currentTimeMillis() + 3000;
@@ -75,7 +75,7 @@ public class LogWriterTest {
 
     @Test public void housekeepingRunsBetweenBatches() throws Exception {
         var sink = new Collecting();
-        var writer = new LogWriter(sink, 100, 10, 10, 30, error -> { });
+        var writer = new LogWriter<LogRecord>("t", sink, 100, 10, 10, 30, error -> { });
         long deadline = System.currentTimeMillis() + 3000;
         while (sink.maintenance.get() == 0 && System.currentTimeMillis() < deadline) Thread.sleep(10);
         writer.close();

@@ -27,7 +27,7 @@ public final class ProtectCommand extends Command {
                 CommandParameter.newEnum("what", new String[]{"here", "check", "stats"}), CommandParameter.newType("radius", true, CommandParamType.INT),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("logPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
-                CommandParameter.newEnum("what", new String[]{"player"}), CommandParameter.newType("name", CommandParamType.STRING),
+                CommandParameter.newEnum("what", new String[]{"player", "commands"}), CommandParameter.newType("name", CommandParamType.STRING),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("reset", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"reset"}),
                 CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
@@ -73,7 +73,7 @@ public final class ProtectCommand extends Command {
     private void help(CommandSender sender) {
         send(sender, "help.title");
         for (String key : List.of("flags", "info")) send(sender, "help." + key);
-        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce", "log", "logCheck", "logPlayer", "logStats")) send(sender, "help." + key);
+        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce", "log", "logCheck", "logPlayer", "logCommands", "logStats")) send(sender, "help." + key);
     }
 
     private void flags(CommandSender sender) {
@@ -108,6 +108,7 @@ public final class ProtectCommand extends Command {
 
     /** /protect log here [radius] [time] [page] | check | player <name> [time] [page] | stats */
     private void log(CommandSender sender, String[] args) {
+        if (need(args, 1).equalsIgnoreCase("commands")) { commands(sender, args); return; }
         var view = plugin.logView();
         if (view == null) throw new IllegalArgumentException("LOG_OFF");
         switch (need(args, 1).toLowerCase(Locale.ROOT)) {
@@ -133,6 +134,22 @@ public final class ProtectCommand extends Command {
             }
             default -> throw new IllegalArgumentException("USAGE");
         }
+    }
+
+    /** /protect log commands [player] [time] [page]: commands and sign text, newest first. */
+    private void commands(CommandSender sender, String[] args) {
+        var audit = plugin.auditView();
+        if (audit == null) throw new IllegalArgumentException("AUDIT_OFF");
+        String who = args.length > 2 ? args[2] : "*";
+        java.util.UUID actor = null;
+        if (!who.equals("*")) {
+            Player online = plugin.getServer().getPlayer(who);
+            actor = online != null ? online.getUniqueId() : plugin.logView() != null ? plugin.logView().player(who) : null;
+            if (actor == null) throw new IllegalArgumentException("LOG_PLAYER_UNKNOWN");
+        }
+        long span = args.length > 3 ? dev.toka.protect.log.TimeSpan.parseMillis(args[3]) : 86_400_000L;
+        int page = args.length > 4 ? Integer.parseInt(args[4]) : 1;
+        audit.show(sender, actor, who.equals("*") ? "*" : who, System.currentTimeMillis() - span, page);
     }
 
     private void reset(CommandSender sender, String[] args) {

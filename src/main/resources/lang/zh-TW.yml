@@ -27,6 +27,7 @@ help:
   log: "§e/protect log here [半徑] [時間] [頁] §7- §b查看附近的方塊變更（預設半徑 5、最近 1d）；時間如 30m、2h、7d"
   logCheck: "§e/protect log check §7- §b進入或離開查詢模式，點擊方塊看它的歷史"
   logPlayer: "§e/protect log player <玩家> [時間] [頁] §7- §b查看某位玩家的方塊變更（用紀錄裡記得的名稱）"
+  logCommands: "§e/protect log commands [玩家|*] [時間] [頁] §7- §b查看指令與告示牌文字的稽核紀錄（* 為所有人）；登入類指令的引數不會保存"
   logStats: "§e/protect log stats §7- §b查看紀錄筆數、最舊時間與檔案大小"
   enforce: "§8加上 enforce 表示強制：下層不能覆蓋。inherit 表示不設定，跟著上一層。"
 flags:
@@ -72,3 +73,10 @@ log:
     empty: "倒下"
     ignite: "點火"
     explode: "爆炸"
+audit:
+  row: "§7${0} §b${1} §8[${2}] §f${3}"
+  kind:
+    command: "指令"
+    console: "主控台"
+    remote: "遠端"
+    sign: "告示牌"

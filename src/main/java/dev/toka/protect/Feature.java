@@ -13,7 +13,9 @@ public enum Feature {
     HAZARDS("hazards", true),
     PISTONS("pistons", false),
     /** Writing block changes to the log. Needs no other plugin. */
-    RECORD("record", false);
+    RECORD("record", false),
+    /** Keeping a record of commands and sign text. Needs no other plugin. */
+    AUDIT("audit", false);
 
     private final String id;
     private final boolean needsClaims;

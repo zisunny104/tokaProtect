@@ -36,11 +36,11 @@ import java.util.Locale;
 public final class LogListener implements Listener {
     private final Plugin plugin;
     private final Rules rules;
-    private final LogWriter writer;
+    private final LogWriter<LogRecord> writer;
     private final Breaker breaker;
     private final int explosionLimit;
 
-    public LogListener(Plugin plugin, Rules rules, LogWriter writer, Breaker breaker, int explosionLimit) {
+    public LogListener(Plugin plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit) {
         this.plugin = plugin;
         this.rules = rules;
         this.writer = writer;

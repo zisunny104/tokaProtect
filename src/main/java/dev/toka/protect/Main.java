@@ -11,6 +11,10 @@ import dev.toka.protect.command.ProtectCommand;
 import dev.toka.protect.flag.FlagTable;
 import dev.toka.protect.flag.Rules;
 import dev.toka.protect.link.Places;
+import dev.toka.protect.audit.AuditRecord;
+import dev.toka.protect.audit.AuditStore;
+import dev.toka.protect.audit.AuditView;
+import dev.toka.protect.listener.AuditListener;
 import dev.toka.protect.listener.Inspector;
 import dev.toka.protect.listener.LogListener;
 import dev.toka.protect.listener.WorldListener;
@@ -47,7 +51,9 @@ public final class Main extends PluginBase implements Listener {
     private Breaker breaker;
     private Set<Feature> enabled = Set.of();
     private LogView logView;
-    private LogWriter logWriter;
+    private LogWriter<LogRecord> logWriter;
+    private LogWriter<AuditRecord> auditWriter;
+    private AuditView auditView;
     private Inspector inspector;
     private final Map<String, Messages> languages = new HashMap<>();
 
@@ -83,6 +89,7 @@ public final class Main extends PluginBase implements Listener {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
             if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
+            if (mode.enforces() && enabled.contains(Feature.AUDIT)) startAudit(config, pluginDirectory);
             command = new ProtectCommand(this);
             var commands = getServer().getCommandMap();
             var existing = commands.getCommand("protect");
@@ -107,7 +114,7 @@ public final class Main extends PluginBase implements Listener {
             LogStore logStore = new LogStore(file);
             long retention = config.getInt("log.retention-days", 90) * 86_400_000L;
             long maxRows = config.getLong("log.max-rows", 3_000_000L);
-            logWriter = new LogWriter(new LogWriter.Sink() {
+            logWriter = new LogWriter<>("log", new LogWriter.Sink<LogRecord>() {
                 public void write(List<LogRecord> batch) throws Exception { logStore.insert(batch); }
                 public void maintain() throws Exception {
                     long removed = logStore.purge(System.currentTimeMillis() - retention, maxRows);
@@ -132,6 +139,36 @@ public final class Main extends PluginBase implements Listener {
         }
     }
 
+    /** Opens the command audit and starts listening. A failure here only turns the audit off. */
+    private void startAudit(cn.nukkit.utils.Config config, Path pluginDirectory) {
+        try {
+            Path file = pluginDirectory.resolve(config.getString("audit.file", "log/commands.db")).normalize();
+            if (!file.startsWith(pluginDirectory)) throw new IllegalArgumentException("audit.file must remain inside the plugin data folder");
+            AuditStore store = new AuditStore(file);
+            long retention = config.getInt("audit.retention-days", 30) * 86_400_000L;
+            long maxRows = config.getLong("audit.max-rows", 500_000L);
+            auditWriter = new LogWriter<>("audit", new LogWriter.Sink<AuditRecord>() {
+                public void write(List<AuditRecord> batch) throws Exception { store.insert(batch); }
+                public void maintain() throws Exception { store.purge(System.currentTimeMillis() - retention, maxRows); }
+            }, config.getInt("audit.queue-size", 5_000), 200, 2_000L, config.getInt("audit.maintenance-minutes", 30) * 60_000L, error -> {
+                if (breaker.failed(Feature.AUDIT, error)) getLogger().error("指令稽核寫入連續失敗，已自動停用；其他保護功能不受影響。", error);
+                else getLogger().warning("指令稽核寫入失敗，這一批已丟棄：" + error);
+            });
+            auditView = new AuditView(this, store, config.getInt("audit.query-rows", 300));
+            java.util.Set<String> hidden = new java.util.HashSet<>();
+            for (String name : config.getStringList("audit.hidden-commands")) hidden.add(name.toLowerCase(Locale.ROOT).replaceFirst("^/", ""));
+            getServer().getPluginManager().registerEvents(new AuditListener(this, auditWriter, breaker, hidden, config.getInt("audit.max-text", 256),
+                    new dev.toka.protect.link.DiscordSender(getServer()), config.getString("audit.discord-channel", "cmd"), config.getBoolean("audit.discord", false)), this);
+            getLogger().info("指令稽核啟用：保留 " + config.getInt("audit.retention-days", 30) + " 天、最多 " + maxRows + " 筆。");
+        } catch (Exception failure) {
+            getLogger().error("指令稽核無法啟動，已關閉；其他保護功能照常。", failure);
+            EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
+            without.addAll(enabled);
+            without.remove(Feature.AUDIT);
+            enabled = Collections.unmodifiableSet(without);
+        }
+    }
+
     /** Regions and claims come from other plugins, which may start after this one or be reloaded. */
     @EventHandler public void onPluginEnabled(PluginEnableEvent event) {
         String name = event.getPlugin().getName();
@@ -145,6 +182,11 @@ public final class Main extends PluginBase implements Listener {
             command.unregister(commands);
         }
         if (instance == this) instance = null;
+        if (auditWriter != null) auditWriter.close();
+        if (auditView != null) {
+            auditView.close();
+            try { auditView.store().close(); } catch (Exception error) { getLogger().error("關閉指令稽核資料庫失敗。", error); }
+        }
         if (logWriter != null) logWriter.close();
         if (logView != null) {
             logView.close();
@@ -164,7 +206,8 @@ public final class Main extends PluginBase implements Listener {
 
     public LogView logView() { return logView; }
     public Inspector inspector() { return inspector; }
-    public LogWriter logWriter() { return logWriter; }
+    public LogWriter<LogRecord> logWriter() { return logWriter; }
+    public AuditView auditView() { return auditView; }
     public Mode mode() { return mode; }
     public Breaker breaker() { return breaker; }
     /** The features switched on by the mode and the configuration; one that has tripped is still listed here. */

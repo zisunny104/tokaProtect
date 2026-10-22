@@ -7,6 +7,7 @@ mode: standby
 # 各功能可單獨關閉（minimal 時 hazards 本來就不運作）。
 features:
   record: true
+  audit: true
   explosions: true
   farmland: true
   pvp: true
@@ -37,3 +38,18 @@ log:
   # 查詢最多讀取的原始筆數、相同動作合併成一行的最大間隔。
   query-rows: 300
   collapse-seconds: 60
+# 指令稽核（audit 功能）：記錄玩家、主控台、遠端輸入的指令與告示牌文字。
+audit:
+  file: log/commands.db
+  retention-days: 30
+  max-rows: 500000
+  queue-size: 5000
+  maintenance-minutes: 30
+  # 單筆最長保留幾個字。
+  max-text: 256
+  # 這些指令只記指令名稱，後面的引數一律遮成 ****（密碼、綁定碼）。不分大小寫、不含斜線。
+  hidden-commands: [login, register, unregister, changepassword, logout, dc, discord, bind]
+  # 是否轉發到 Discord 指令頻道（需要 tokaDiscordLink）。
+  discord: false
+  discord-channel: cmd
+  query-rows: 300

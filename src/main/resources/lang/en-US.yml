@@ -27,6 +27,7 @@ help:
   log: "§e/protect log here [radius] [time] [page] §7- §bShow block changes nearby (default radius 5, last 1d); time like 30m, 2h, 7d"
   logCheck: "§e/protect log check §7- §bTurn inspect mode on or off; touch a block to see its history"
   logPlayer: "§e/protect log player <player> [time] [page] §7- §bShow one player's block changes (by the name the log remembers)"
+  logCommands: "§e/protect log commands [player|*] [time] [page] §7- §bShow the audit of commands and sign text (* = everyone); arguments of login-style commands are never kept"
   logStats: "§e/protect log stats §7- §bShow the row count, oldest entry and file size"
   enforce: "§8enforce stops layers below from overriding it. inherit clears the setting and follows the layer above."
 flags:
@@ -72,3 +73,10 @@ log:
     empty: "poured"
     ignite: "lit"
     explode: "exploded"
+audit:
+  row: "§7${0} §b${1} §8[${2}] §f${3}"
+  kind:
+    command: "command"
+    console: "console"
+    remote: "remote"
+    sign: "sign"
