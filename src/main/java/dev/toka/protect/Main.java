@@ -55,6 +55,7 @@ public final class Main extends PluginBase implements Listener {
     private LogWriter<AuditRecord> auditWriter;
     private AuditView auditView;
     private Inspector inspector;
+    private dev.toka.protect.rollback.Rollback rollback;
     private final Map<String, Messages> languages = new HashMap<>();
 
     @Override public void onEnable() {
@@ -126,6 +127,8 @@ public final class Main extends PluginBase implements Listener {
                 else getLogger().warning("方塊紀錄寫入失敗，這一批已丟棄：" + error);
             });
             logView = new LogView(this, logStore, config.getInt("log.query-rows", 300), config.getInt("log.collapse-seconds", 60) * 1000L);
+            rollback = new dev.toka.protect.rollback.Rollback(this, logStore, config.getInt("rollback.max-rows", 200_000), config.getInt("rollback.max-blocks", 100_000),
+                    config.getInt("rollback.blocks-per-tick", 200), config.getInt("rollback.confirm-seconds", 60) * 1000L);
             inspector = new Inspector(logView, null);
             getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000)), this);
             getServer().getPluginManager().registerEvents(inspector, this);
@@ -188,6 +191,7 @@ public final class Main extends PluginBase implements Listener {
             try { auditView.store().close(); } catch (Exception error) { getLogger().error("關閉指令稽核資料庫失敗。", error); }
         }
         if (logWriter != null) logWriter.close();
+        if (rollback != null) rollback.close();
         if (logView != null) {
             logView.close();
             try { logView.store().close(); } catch (Exception error) { getLogger().error("關閉方塊紀錄資料庫失敗。", error); }
@@ -205,6 +209,7 @@ public final class Main extends PluginBase implements Listener {
     }
 
     public LogView logView() { return logView; }
+    public dev.toka.protect.rollback.Rollback rollback() { return rollback; }
     public Inspector inspector() { return inspector; }
     public LogWriter<LogRecord> logWriter() { return logWriter; }
     public AuditView auditView() { return auditView; }

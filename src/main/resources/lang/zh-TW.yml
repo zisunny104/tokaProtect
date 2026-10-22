@@ -29,6 +29,7 @@ help:
   logPlayer: "§e/protect log player <玩家> [時間] [頁] §7- §b查看某位玩家的方塊變更（用紀錄裡記得的名稱）"
   logCommands: "§e/protect log commands [玩家|*] [時間] [頁] §7- §b查看指令與告示牌文字的稽核紀錄（* 為所有人）；登入類指令的引數不會保存"
   logStats: "§e/protect log stats §7- §b查看紀錄筆數、最舊時間與檔案大小"
+  rollback: "§e/protect rollback player <名稱> [時間] §7- §b預覽還原某人的方塊變更（預設 1d）；另有 here [半徑] [時間]、confirm、cancel"
   enforce: "§8加上 enforce 表示強制：下層不能覆蓋。inherit 表示不設定，跟著上一層。"
 flags:
   title: "§6=== §f§l保護旗標§r §6==="
@@ -80,3 +81,14 @@ audit:
     console: "主控台"
     remote: "遠端"
     sign: "告示牌"
+rollback:
+  reading: "§7正在讀取紀錄…"
+  tooManyRows: "§c符合的紀錄超過 ${0} 筆，請縮短時間或縮小範圍。"
+  tooManyBlocks: "§c需要還原 ${0} 個位置，超過上限 ${1}，請縮短時間或縮小範圍。"
+  nothing: "§e${0}：沒有需要還原的方塊。"
+  preview: "§e${0}：將還原 §f${1} §e個位置（讀了 ${2} 筆紀錄）。§7${3} 秒內輸入 §e/protect rollback confirm §7執行，或 cancel 取消。只還原方塊，不含箱子內容與告示牌文字；之後又被改過的位置會略過。"
+  noPlan: "§c沒有待確認的還原，或已逾時。請重新預覽。"
+  running: "§c已有還原正在進行，請稍後。"
+  started: "§e開始還原 ${0} 個位置…"
+  done: "§a還原完成：已還原 §f${0}§a，略過 §f${1}§a（之後被改過或世界未載入）。"
+  cancelled: "§7已取消。"

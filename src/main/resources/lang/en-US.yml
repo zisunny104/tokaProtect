@@ -29,6 +29,7 @@ help:
   logPlayer: "§e/protect log player <player> [time] [page] §7- §bShow one player's block changes (by the name the log remembers)"
   logCommands: "§e/protect log commands [player|*] [time] [page] §7- §bShow the audit of commands and sign text (* = everyone); arguments of login-style commands are never kept"
   logStats: "§e/protect log stats §7- §bShow the row count, oldest entry and file size"
+  rollback: "§e/protect rollback player <name> [time] §7- §bPreview undoing someone's block changes (default 1d); also here [radius] [time], confirm, cancel"
   enforce: "§8enforce stops layers below from overriding it. inherit clears the setting and follows the layer above."
 flags:
   title: "§6=== §f§lProtect Flags§r §6==="
@@ -80,3 +81,14 @@ audit:
     console: "console"
     remote: "remote"
     sign: "sign"
+rollback:
+  reading: "§7Reading the log…"
+  tooManyRows: "§cMore than ${0} log rows match; use a shorter time or a smaller area."
+  tooManyBlocks: "§c${0} places would change, over the limit of ${1}; use a shorter time or a smaller area."
+  nothing: "§e${0}: nothing to restore."
+  preview: "§e${0}: will restore §f${1} §eplaces (read ${2} rows). §7Within ${3}s type §e/protect rollback confirm §7to run, or cancel. Only blocks come back, not chest contents or sign text; spots changed since are skipped."
+  noPlan: "§cNo rollback is waiting for confirmation, or it timed out. Preview again."
+  running: "§cA rollback is already running; wait for it."
+  started: "§eRestoring ${0} places…"
+  done: "§aRollback finished: restored §f${0}§a, skipped §f${1}§a (changed since, or world not loaded)."
+  cancelled: "§7Cancelled."

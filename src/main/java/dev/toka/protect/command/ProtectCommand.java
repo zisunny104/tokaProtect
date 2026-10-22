@@ -29,6 +29,14 @@ public final class ProtectCommand extends Command {
         addCommandParameters("logPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
                 CommandParameter.newEnum("what", new String[]{"player", "commands"}), CommandParameter.newType("name", CommandParamType.STRING),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("rollbackHere", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
+                CommandParameter.newEnum("what", new String[]{"here"}), CommandParameter.newType("radius", true, CommandParamType.INT),
+                CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
+                CommandParameter.newEnum("what", new String[]{"player"}), CommandParameter.newType("name", CommandParamType.STRING),
+                CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackRun", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
+                CommandParameter.newEnum("what", new String[]{"confirm", "cancel"})});
         addCommandParameters("reset", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"reset"}),
                 CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
         addCommandParameters("show", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"show"}),
@@ -51,6 +59,7 @@ public final class ProtectCommand extends Command {
                 case "info" -> info(sender);
                 case "status" -> { admin(sender); status(sender); }
                 case "log" -> { admin(sender); log(sender, args); }
+                case "rollback" -> { admin(sender); rollback(sender, args); }
                 case "reset" -> { admin(sender); reset(sender, args); }
                 case "show" -> { admin(sender); show(sender, args); }
                 case "set" -> { admin(sender); set(sender, args); }
@@ -73,7 +82,7 @@ public final class ProtectCommand extends Command {
     private void help(CommandSender sender) {
         send(sender, "help.title");
         for (String key : List.of("flags", "info")) send(sender, "help." + key);
-        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce", "log", "logCheck", "logPlayer", "logCommands", "logStats")) send(sender, "help." + key);
+        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce", "log", "logCheck", "logPlayer", "logCommands", "logStats", "rollback")) send(sender, "help." + key);
     }
 
     private void flags(CommandSender sender) {
@@ -131,6 +140,32 @@ public final class ProtectCommand extends Command {
                 long span = args.length > 3 ? dev.toka.protect.log.TimeSpan.parseMillis(args[3]) : 86_400_000L;
                 int page = args.length > 4 ? Integer.parseInt(args[4]) : 1;
                 view.show(sender, dev.toka.protect.log.LogStore.Query.byPlayer(who, System.currentTimeMillis() - span, 0, 0), args[2], page);
+            }
+            default -> throw new IllegalArgumentException("USAGE");
+        }
+    }
+
+    /** /protect rollback here [radius] [time] | player <name> [time] | confirm | cancel */
+    private void rollback(CommandSender sender, String[] args) {
+        var rollback = plugin.rollback();
+        if (rollback == null) throw new IllegalArgumentException("LOG_OFF");
+        var view = plugin.logView();
+        switch (need(args, 1).toLowerCase(Locale.ROOT)) {
+            case "confirm" -> rollback.confirm(sender);
+            case "cancel" -> rollback.cancel(sender);
+            case "here" -> {
+                Player player = view.requirePlayer(sender);
+                int radius = args.length > 2 ? Integer.parseInt(args[2]) : 5;
+                if (radius < 0 || radius > 64) throw new IllegalArgumentException("RADIUS");
+                long span = args.length > 3 ? dev.toka.protect.log.TimeSpan.parseMillis(args[3]) : 86_400_000L;
+                String world = player.getLevel().getFolderName();
+                rollback.preview(sender, dev.toka.protect.log.LogStore.Query.at(world, player.getFloorX(), player.getFloorY(), player.getFloorZ(),
+                        radius, System.currentTimeMillis() - span, 0, 0), world + " ±" + radius);
+            }
+            case "player" -> {
+                java.util.UUID who = view.player(need(args, 2));
+                long span = args.length > 3 ? dev.toka.protect.log.TimeSpan.parseMillis(args[3]) : 86_400_000L;
+                rollback.preview(sender, dev.toka.protect.log.LogStore.Query.byPlayer(who, System.currentTimeMillis() - span, 0, 0), args[2]);
             }
             default -> throw new IllegalArgumentException("USAGE");
         }

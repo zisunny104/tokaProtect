@@ -2,6 +2,7 @@ package dev.toka.protect.listener;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPrimedTNT;
 import cn.nukkit.event.EventHandler;
@@ -63,10 +64,10 @@ public final class LogListener implements Listener {
         else plugin.getLogger().warning("方塊紀錄出錯，這筆未記錄：" + error);
     }
 
-    private void write(Player player, Action action, Block block, int id, int meta) {
+    private void write(Player player, Action action, Block block, int id, int meta, int prevId, int prevMeta) {
         try {
             writer.offer(LogRecord.byPlayer(System.currentTimeMillis(), player.getUniqueId(), player.getName(), action,
-                    block.getLevel().getFolderName(), block.getFloorX(), block.getFloorY(), block.getFloorZ(), id, meta));
+                    block.getLevel().getFolderName(), block.getFloorX(), block.getFloorY(), block.getFloorZ(), id, meta, prevId, prevMeta));
         } catch (RuntimeException error) {
             failed(error);
         }
@@ -75,33 +76,33 @@ public final class LogListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         Block block = event.getBlock();
-        if (recording(block)) write(event.getPlayer(), Action.PLACE, block, block.getId(), block.getDamage());
+        if (recording(block)) write(event.getPlayer(), Action.PLACE, block, block.getId(), block.getDamage(), event.getBlockReplace().getId(), event.getBlockReplace().getDamage());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        if (recording(block)) write(event.getPlayer(), Action.BREAK, block, block.getId(), block.getDamage());
+        if (recording(block)) write(event.getPlayer(), Action.BREAK, block, block.getId(), block.getDamage(), block.getId(), block.getDamage());
     }
 
     /** The liquid poured is whatever the core says the bucket holds, so no ids are listed here. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEmpty(PlayerBucketEmptyEvent event) {
         Block target = event.getBlockClicked().getSide(event.getBlockFace());
-        if (recording(target)) write(event.getPlayer(), Action.EMPTY, target, ItemBucket.getBlockByDamage(event.getBucket().getDamage()), 0);
+        if (recording(target)) write(event.getPlayer(), Action.EMPTY, target, ItemBucket.getBlockByDamage(event.getBucket().getDamage()), 0, target.getId(), target.getDamage());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onFill(PlayerBucketFillEvent event) {
         Block liquid = event.getBlockClicked();
-        if (recording(liquid)) write(event.getPlayer(), Action.FILL, liquid, liquid.getId(), liquid.getDamage());
+        if (recording(liquid)) write(event.getPlayer(), Action.FILL, liquid, liquid.getId(), liquid.getDamage(), liquid.getId(), liquid.getDamage());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onIgnite(BlockIgniteEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         Block block = event.getBlock();
-        if (recording(block)) write(player, Action.IGNITE, block, block.getId(), block.getDamage());
+        if (recording(block)) write(player, Action.IGNITE, block, BlockID.FIRE, 0, block.getId(), block.getDamage());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

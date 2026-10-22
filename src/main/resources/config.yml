@@ -38,6 +38,12 @@ log:
   # 查詢最多讀取的原始筆數、相同動作合併成一行的最大間隔。
   query-rows: 300
   collapse-seconds: 60
+  # 方塊還原（/protect rollback）：預覽讀取的紀錄與位置上限、每刻處理方塊數、確認時限。
+rollback:
+  max-rows: 200000
+  max-blocks: 100000
+  blocks-per-tick: 200
+  confirm-seconds: 60
 # 指令稽核（audit 功能）：記錄玩家、主控台、遠端輸入的指令與告示牌文字。
 audit:
   file: log/commands.db

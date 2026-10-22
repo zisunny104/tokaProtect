@@ -90,6 +90,6 @@ public class LogStoreTest {
     }
 
     @Test(expected = IllegalArgumentException.class) public void aChangeWithNeitherPlayerNorCauseIsRejected() {
-        new LogRecord(1, null, null, null, Action.BREAK, "w", 0, 0, 0, 1, 0);
+        new LogRecord(1, null, null, null, Action.BREAK, "w", 0, 0, 0, 1, 0, 1, 0);
     }
 }
