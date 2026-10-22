@@ -9,7 +9,7 @@ public class LogFormatTest {
     private static final UUID ALEX = UUID.randomUUID(), SAM = UUID.randomUUID();
 
     private static LogStore.Row row(long time, UUID who, Action action, int block) {
-        return new LogStore.Row(time, time, who, "n", null, action, "w", 0, 0, 0, block, 0, block, 0);
+        return new LogStore.Row(time, time, who, "n", null, action, "w", 0, 0, 0, block, 0, block, 0, null);
     }
 
     @Test public void aRunOfTheSameThingBecomesOneLine() {

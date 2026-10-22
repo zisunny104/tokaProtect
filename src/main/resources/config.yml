@@ -35,6 +35,9 @@ log:
   maintenance-minutes: 30
   # 單次爆炸最多記錄的方塊數。
   explosion-block-limit: 2000
+  # 破壞或被炸時一併保留告示牌文字等小型方塊資料（用核心的方塊實體 id），讓還原能一起放回；容器內容不保存。
+  tile-data: [Sign, Skull, Banner, FlowerPot]
+  tile-data-max-bytes: 2048
   # 查詢最多讀取的原始筆數、相同動作合併成一行的最大間隔。
   query-rows: 300
   collapse-seconds: 60

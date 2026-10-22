@@ -16,7 +16,7 @@ public final class RollbackPlan {
     private RollbackPlan() {}
 
     /** @param expectedId the block id that must be there now for the restore to be safe */
-    public record Entry(String world, int x, int y, int z, int restoreId, int restoreMeta, int expectedId) {}
+    public record Entry(String world, int x, int y, int z, int restoreId, int restoreMeta, byte[] restoreNbt, int expectedId) {}
 
     /** What a change leaves behind: placed, poured and lit things stay; broken, scooped and blown-up things leave air. */
     static int[] after(LogStore.Row row) {
@@ -39,8 +39,8 @@ public final class RollbackPlan {
             int[] now = after(span.last());
             LogStore.Row first = span.first();
             // Putting back what is already there would change nothing.
-            if (first.prevBlock() == now[0] && first.prevMeta() == now[1]) continue;
-            entries.add(new Entry(first.world(), first.x(), first.y(), first.z(), first.prevBlock(), first.prevMeta(), now[0]));
+            if (first.prevBlock() == now[0] && first.prevMeta() == now[1] && first.prevNbt() == null) continue;
+            entries.add(new Entry(first.world(), first.x(), first.y(), first.z(), first.prevBlock(), first.prevMeta(), first.prevNbt(), now[0]));
         }
         return entries;
     }

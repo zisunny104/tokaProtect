@@ -130,7 +130,8 @@ public final class Main extends PluginBase implements Listener {
             rollback = new dev.toka.protect.rollback.Rollback(this, logStore, config.getInt("rollback.max-rows", 200_000), config.getInt("rollback.max-blocks", 100_000),
                     config.getInt("rollback.blocks-per-tick", 200), config.getInt("rollback.confirm-seconds", 60) * 1000L);
             inspector = new Inspector(logView, null);
-            getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000)), this);
+            getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000),
+                    new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))), this);
             getServer().getPluginManager().registerEvents(inspector, this);
             getLogger().info("方塊紀錄啟用：保留 " + config.getInt("log.retention-days", 90) + " 天、最多 " + maxRows + " 筆。");
         } catch (Exception failure) {

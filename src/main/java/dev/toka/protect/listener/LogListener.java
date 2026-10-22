@@ -25,6 +25,7 @@ import dev.toka.protect.flag.Rules;
 import dev.toka.protect.log.Action;
 import dev.toka.protect.log.LogRecord;
 import dev.toka.protect.log.LogWriter;
+import dev.toka.protect.log.TileNbt;
 import java.util.List;
 import java.util.Locale;
 
@@ -40,13 +41,15 @@ public final class LogListener implements Listener {
     private final LogWriter<LogRecord> writer;
     private final Breaker breaker;
     private final int explosionLimit;
+    private final TileNbt tiles;
 
-    public LogListener(Plugin plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit) {
+    public LogListener(Plugin plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit, TileNbt tiles) {
         this.plugin = plugin;
         this.rules = rules;
         this.writer = writer;
         this.breaker = breaker;
         this.explosionLimit = explosionLimit;
+        this.tiles = tiles;
     }
 
     private boolean recording(Position at) {
@@ -64,10 +67,10 @@ public final class LogListener implements Listener {
         else plugin.getLogger().warning("方塊紀錄出錯，這筆未記錄：" + error);
     }
 
-    private void write(Player player, Action action, Block block, int id, int meta, int prevId, int prevMeta) {
+    private void write(Player player, Action action, Block block, int id, int meta, int prevId, int prevMeta, boolean keepTile) {
         try {
             writer.offer(LogRecord.byPlayer(System.currentTimeMillis(), player.getUniqueId(), player.getName(), action,
-                    block.getLevel().getFolderName(), block.getFloorX(), block.getFloorY(), block.getFloorZ(), id, meta, prevId, prevMeta));
+                    block.getLevel().getFolderName(), block.getFloorX(), block.getFloorY(), block.getFloorZ(), id, meta, prevId, prevMeta, keepTile ? tiles.capture(block) : null));
         } catch (RuntimeException error) {
             failed(error);
         }
@@ -76,33 +79,33 @@ public final class LogListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         Block block = event.getBlock();
-        if (recording(block)) write(event.getPlayer(), Action.PLACE, block, block.getId(), block.getDamage(), event.getBlockReplace().getId(), event.getBlockReplace().getDamage());
+        if (recording(block)) write(event.getPlayer(), Action.PLACE, block, block.getId(), block.getDamage(), event.getBlockReplace().getId(), event.getBlockReplace().getDamage(), false);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        if (recording(block)) write(event.getPlayer(), Action.BREAK, block, block.getId(), block.getDamage(), block.getId(), block.getDamage());
+        if (recording(block)) write(event.getPlayer(), Action.BREAK, block, block.getId(), block.getDamage(), block.getId(), block.getDamage(), true);
     }
 
     /** The liquid poured is whatever the core says the bucket holds, so no ids are listed here. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEmpty(PlayerBucketEmptyEvent event) {
         Block target = event.getBlockClicked().getSide(event.getBlockFace());
-        if (recording(target)) write(event.getPlayer(), Action.EMPTY, target, ItemBucket.getBlockByDamage(event.getBucket().getDamage()), 0, target.getId(), target.getDamage());
+        if (recording(target)) write(event.getPlayer(), Action.EMPTY, target, ItemBucket.getBlockByDamage(event.getBucket().getDamage()), 0, target.getId(), target.getDamage(), false);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onFill(PlayerBucketFillEvent event) {
         Block liquid = event.getBlockClicked();
-        if (recording(liquid)) write(event.getPlayer(), Action.FILL, liquid, liquid.getId(), liquid.getDamage(), liquid.getId(), liquid.getDamage());
+        if (recording(liquid)) write(event.getPlayer(), Action.FILL, liquid, liquid.getId(), liquid.getDamage(), liquid.getId(), liquid.getDamage(), false);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onIgnite(BlockIgniteEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         Block block = event.getBlock();
-        if (recording(block)) write(player, Action.IGNITE, block, BlockID.FIRE, 0, block.getId(), block.getDamage());
+        if (recording(block)) write(player, Action.IGNITE, block, BlockID.FIRE, 0, block.getId(), block.getDamage(), false);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -133,8 +136,8 @@ public final class LogListener implements Listener {
                 if (written++ >= explosionLimit) break;
                 String world = block.getLevel().getFolderName();
                 writer.offer(player != null
-                        ? LogRecord.byPlayer(now, player.getUniqueId(), player.getName(), Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage())
-                        : LogRecord.byCause(now, cause, Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage()));
+                        ? LogRecord.byPlayer(now, player.getUniqueId(), player.getName(), Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage(), block.getId(), block.getDamage(), tiles.capture(block))
+                        : LogRecord.byCause(now, cause, Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage(), tiles.capture(block)));
             }
         } catch (RuntimeException error) {
             failed(error);

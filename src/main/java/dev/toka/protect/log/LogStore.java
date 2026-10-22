@@ -23,7 +23,7 @@ public final class LogStore implements AutoCloseable {
         }
     }
 
-    public record Row(long id, long time, UUID actor, String actorName, String cause, Action action, String world, int x, int y, int z, int block, int meta, int prevBlock, int prevMeta) {}
+    public record Row(long id, long time, UUID actor, String actorName, String cause, Action action, String world, int x, int y, int z, int block, int meta, int prevBlock, int prevMeta, byte[] prevNbt) {}
 
     public record Stats(long rows, Long oldest, long fileBytes) {}
 
@@ -47,7 +47,7 @@ public final class LogStore implements AutoCloseable {
             s.execute("CREATE TABLE IF NOT EXISTS causes(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
             s.execute("CREATE TABLE IF NOT EXISTS log(id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, actor INTEGER, cause INTEGER,"
                     + " action INTEGER NOT NULL, world INTEGER NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, z INTEGER NOT NULL,"
-                    + " block INTEGER NOT NULL, meta INTEGER NOT NULL, pblock INTEGER NOT NULL DEFAULT 0, pmeta INTEGER NOT NULL DEFAULT 0)");
+                    + " block INTEGER NOT NULL, meta INTEGER NOT NULL, pblock INTEGER NOT NULL DEFAULT 0, pmeta INTEGER NOT NULL DEFAULT 0, pnbt BLOB)");
             addMissingColumns(s);
             s.execute("CREATE INDEX IF NOT EXISTS log_pos ON log(world, x, z, y, t)");
             s.execute("CREATE INDEX IF NOT EXISTS log_actor ON log(actor, t)");
@@ -60,14 +60,16 @@ public final class LogStore implements AutoCloseable {
         }
     }
 
-    /** Databases made before rollback existed lack the previous-block columns; add them, treating old rows as "unknown = same". */
+    /** Databases made before rollback (or tile data) existed lack the previous-block columns; add them, treating old rows as "unknown = same". */
     private void addMissingColumns(Statement s) throws SQLException {
-        boolean has = false;
-        try (ResultSet r = s.executeQuery("PRAGMA table_info(log)")) { while (r.next()) if (r.getString(2).equals("pblock")) has = true; }
-        if (has) return;
-        s.execute("ALTER TABLE log ADD COLUMN pblock INTEGER NOT NULL DEFAULT 0");
-        s.execute("ALTER TABLE log ADD COLUMN pmeta INTEGER NOT NULL DEFAULT 0");
-        s.execute("UPDATE log SET pblock = block, pmeta = meta");
+        Set<String> columns = new HashSet<>();
+        try (ResultSet r = s.executeQuery("PRAGMA table_info(log)")) { while (r.next()) columns.add(r.getString(2)); }
+        if (!columns.contains("pblock")) {
+            s.execute("ALTER TABLE log ADD COLUMN pblock INTEGER NOT NULL DEFAULT 0");
+            s.execute("ALTER TABLE log ADD COLUMN pmeta INTEGER NOT NULL DEFAULT 0");
+            s.execute("UPDATE log SET pblock = block, pmeta = meta");
+        }
+        if (!columns.contains("pnbt")) s.execute("ALTER TABLE log ADD COLUMN pnbt BLOB");
     }
 
     private int intern(String table, Map<String, Integer> cache, String name) throws SQLException {
@@ -107,7 +109,7 @@ public final class LogStore implements AutoCloseable {
         if (records.isEmpty()) return;
         boolean auto = db.getAutoCommit();
         db.setAutoCommit(false);
-        try (PreparedStatement insert = db.prepareStatement("INSERT INTO log(t, actor, cause, action, world, x, y, z, block, meta, pblock, pmeta) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")) {
+        try (PreparedStatement insert = db.prepareStatement("INSERT INTO log(t, actor, cause, action, world, x, y, z, block, meta, pblock, pmeta, pnbt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
             for (LogRecord r : records) {
                 insert.setLong(1, r.time());
                 if (r.actor() != null) { insert.setInt(2, actor(r.actor(), r.actorName())); insert.setNull(3, Types.INTEGER); }
@@ -121,6 +123,7 @@ public final class LogStore implements AutoCloseable {
                 insert.setInt(10, r.meta());
                 insert.setInt(11, r.prevBlock());
                 insert.setInt(12, r.prevMeta());
+                if (r.prevNbt() != null) insert.setBytes(13, r.prevNbt()); else insert.setNull(13, Types.BLOB);
                 insert.addBatch();
             }
             insert.executeBatch();
@@ -151,7 +154,7 @@ public final class LogStore implements AutoCloseable {
 
     /** Oldest first when {@code ascending}, which is the order a rollback replays. */
     public synchronized List<Row> find(Query q, boolean ascending) throws SQLException {
-        StringBuilder sql = new StringBuilder("SELECT l.id, l.t, a.uuid, a.name, c.name, l.action, w.name, l.x, l.y, l.z, l.block, l.meta, l.pblock, l.pmeta FROM log l "
+        StringBuilder sql = new StringBuilder("SELECT l.id, l.t, a.uuid, a.name, c.name, l.action, w.name, l.x, l.y, l.z, l.block, l.meta, l.pblock, l.pmeta, l.pnbt FROM log l "
                 + "JOIN worlds w ON w.id = l.world LEFT JOIN actors a ON a.id = l.actor LEFT JOIN causes c ON c.id = l.cause WHERE 1=1");
         List<Object> args = new ArrayList<>();
         if (q.world() != null) {
@@ -182,7 +185,7 @@ public final class LogStore implements AutoCloseable {
                 while (r.next()) {
                     String uuid = r.getString(3);
                     rows.add(new Row(r.getLong(1), r.getLong(2), uuid == null ? null : UUID.fromString(uuid), r.getString(4), r.getString(5),
-                            Action.byCode(r.getInt(6)), r.getString(7), r.getInt(8), r.getInt(9), r.getInt(10), r.getInt(11), r.getInt(12), r.getInt(13), r.getInt(14)));
+                            Action.byCode(r.getInt(6)), r.getString(7), r.getInt(8), r.getInt(9), r.getInt(10), r.getInt(11), r.getInt(12), r.getInt(13), r.getInt(14), r.getBytes(15)));
                 }
             }
         }

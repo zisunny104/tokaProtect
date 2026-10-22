@@ -7,6 +7,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.scheduler.Task;
 import dev.toka.protect.Main;
 import dev.toka.protect.log.LogStore;
+import dev.toka.protect.log.TileNbt;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Undoes logged block changes in two steps: a preview that reads the log in the background and says how much would change,
  * and a confirmation that applies it a slice per tick so the server never stalls. A spot someone changed again afterwards is
- * left alone, and only blocks come back (chest contents and sign text are not in the log).
+ * left alone, and blocks come back with the tile data of the configured kinds (signs, heads, banners), not chest contents.
  */
 public final class Rollback implements AutoCloseable {
     private record Pending(List<RollbackPlan.Entry> entries, String title, long createdAt) {}
@@ -114,6 +115,7 @@ public final class Rollback implements AutoCloseable {
         Vector3 at = new Vector3(entry.x(), entry.y(), entry.z());
         if (level.getBlock(at).getId() != entry.expectedId()) return false;
         level.setBlock(at, Block.get(entry.restoreId(), entry.restoreMeta()), false, true);
+        TileNbt.restore(level, entry.x(), entry.y(), entry.z(), entry.restoreNbt());
         return true;
     }
 

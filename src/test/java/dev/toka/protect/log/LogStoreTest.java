@@ -18,7 +18,7 @@ public class LogStoreTest {
     @Test public void recordsComeBackNewestFirstWithTheirNames() throws Exception {
         try (var store = new LogStore(temporary.newFolder().toPath().resolve("log.db"))) {
             store.insert(List.of(place(100, ALEX, "Alex", 1, 64, 1), place(200, SAM, "Sam", 1, 64, 1),
-                    LogRecord.byCause(300, "tnt", Action.EXPLODE, "survival", 1, 64, 1, 2, 0)));
+                    LogRecord.byCause(300, "tnt", Action.EXPLODE, "survival", 1, 64, 1, 2, 0, null)));
             var rows = store.find(LogStore.Query.at("survival", 1, 64, 1, 0, null, 10, 0));
             assertEquals(3, rows.size());
             assertEquals("tnt", rows.get(0).cause());

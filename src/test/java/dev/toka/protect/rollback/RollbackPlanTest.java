@@ -12,7 +12,7 @@ public class RollbackPlanTest {
     private static final int AIR = 0, STONE = 1, GRASS = 2, GLASS = 20;
 
     private static LogStore.Row row(long t, Action action, int x, int block, int prev) {
-        return new LogStore.Row(t, t, ALEX, "Alex", null, action, "w", x, 64, 0, block, 0, prev, 0);
+        return new LogStore.Row(t, t, ALEX, "Alex", null, action, "w", x, 64, 0, block, 0, prev, 0, null);
     }
 
     @Test public void aBrokenBlockIsPutBack() {
@@ -50,5 +50,11 @@ public class RollbackPlanTest {
         assertEquals(8, plan.get(0).restoreId());
         assertEquals(AIR, plan.get(1).restoreId());
         assertEquals(8, plan.get(1).expectedId());
+    }
+
+    @Test public void aBrokenSignComesBackWithItsText() {
+        byte[] text = {1, 2, 3};
+        var plan = RollbackPlan.build(List.of(new LogStore.Row(1, 1, ALEX, "Alex", null, Action.BREAK, "w", 0, 64, 0, 63, 0, 63, 0, text)));
+        assertArrayEquals(text, plan.get(0).restoreNbt());
     }
 }
