@@ -1,0 +1,8 @@
+language: zh-TW
+# 待命＝false：不攔截任何事件，只能用 /protect 預先設定旗標。
+# 確認 zero 的舊保護規則（Protect、block-log 的保護部分、領地外清除）已停用後才改為 true。
+active: false
+storage:
+  backend: SQLITE
+  schema-version: 1
+  directory: storage

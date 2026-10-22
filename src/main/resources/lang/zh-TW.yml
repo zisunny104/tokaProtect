@@ -1,0 +1,47 @@
+cmd:
+  denied: "§c你沒有使用此指令的權限。"
+  failed: "§c[保護] 無法完成：${0}"
+  usage: "§e[保護] 用法錯誤，輸入 /protect help 查看指令。"
+done: "§a[保護] 完成。"
+word:
+  allow: "§a允許"
+  deny: "§c拒絕"
+  on: "§a啟用"
+  standby: "§e待命"
+  yes: "§a有"
+  no: "§7無"
+layer:
+  world: "世界 ${0}"
+  region: "區域 ${0}"
+  claim: "領地 ${0}"
+  default: "預設"
+help:
+  title: "§6=== §f§l保護 說明§r §6==="
+  flags: "§e/protect flags §7- §b列出所有旗標與預設值"
+  info: "§e/protect info §7- §b查看腳下每個旗標是否允許，以及由哪一層決定"
+  status: "§e/protect status §7- §b查看啟用狀態與設定數量"
+  show: "§e/protect show <world|region|claim> <目標> §7- §b列出該層的設定"
+  set: "§e/protect set <world|region|claim> <目標> <旗標> <allow|deny|inherit> [enforce] §7- §b設定一層的旗標"
+  layers: "§8目標：世界填世界資料夾名稱、區域填區域名稱、領地填領地 ID。越小的層級優先：領地 > 區域 > 世界 > 預設。"
+  enforce: "§8加上 enforce 表示強制：下層不能覆蓋。inherit 表示不設定，跟著上一層。"
+flags:
+  title: "§6=== §f§l保護旗標§r §6==="
+  row: "§e${0} §7- ${1} §8| §b${2}"
+flag:
+  pvp: "玩家可以互相傷害（pvp 類型領地自己允許）"
+  explosions: "爆炸可以破壞方塊"
+  farmland-trample: "耕地可以被踩壞"
+  farmland-decay: "耕地可以自然變形或乾涸"
+  unclaimed-liquids: "水與岩漿可以出現在領地外，拒絕時會被清除"
+  unclaimed-fire: "火可以出現在領地外，拒絕時會被清除"
+  unclaimed-pistons: "活塞可以出現在領地外，拒絕時會被清除"
+  piston-chests: "活塞可以推動箱子"
+  record: "這裡的方塊變更要寫入紀錄"
+info:
+  title: "§b[保護] ${0} (${1}, ${2}, ${3})"
+  row: "§e${0} §7- ${1} §8| §7${2}"
+status: "§b[保護] 狀態：${0}§b；已設定 ${1} 筆；區域插件：${2}§b；領地插件：${3}"
+show:
+  title: "§b[保護] ${0} 的設定，共 ${1} 筆："
+  row: "§e${0} §7- §f${1} ${2}"
+  enforced: "§6（強制）"

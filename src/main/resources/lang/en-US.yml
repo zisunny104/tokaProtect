@@ -1,0 +1,47 @@
+cmd:
+  denied: "§cYou may not use this command."
+  failed: "§c[Protect] Could not finish: ${0}"
+  usage: "§e[Protect] Wrong usage; see /protect help."
+done: "§a[Protect] Done."
+word:
+  allow: "§aallowed"
+  deny: "§cdenied"
+  on: "§aactive"
+  standby: "§estandby"
+  yes: "§ayes"
+  no: "§7no"
+layer:
+  world: "world ${0}"
+  region: "region ${0}"
+  claim: "claim ${0}"
+  default: "default"
+help:
+  title: "§6=== §f§lProtect Help§r §6==="
+  flags: "§e/protect flags §7- §bList every flag with its default"
+  info: "§e/protect info §7- §bShow each flag under your feet and which layer decided it"
+  status: "§e/protect status §7- §bShow whether it is active and how many settings exist"
+  show: "§e/protect show <world|region|claim> <target> §7- §bList a layer's settings"
+  set: "§e/protect set <world|region|claim> <target> <flag> <allow|deny|inherit> [enforce] §7- §bChange a flag on one layer"
+  layers: "§8Target: a world's folder name, a region's name or a claim's id. Narrower wins: claim > region > world > default."
+  enforce: "§8enforce stops layers below from overriding it. inherit clears the setting and follows the layer above."
+flags:
+  title: "§6=== §f§lProtect Flags§r §6==="
+  row: "§e${0} §7- ${1} §8| §b${2}"
+flag:
+  pvp: "Players may hurt each other (pvp claims allow it for themselves)"
+  explosions: "Explosions may break blocks"
+  farmland-trample: "Farmland may be trampled"
+  farmland-decay: "Farmland may dry out or be formed by the game"
+  unclaimed-liquids: "Water and lava may exist outside claims; when denied they are removed"
+  unclaimed-fire: "Fire may exist outside claims; when denied it is removed"
+  unclaimed-pistons: "Pistons may exist outside claims; when denied they are removed"
+  piston-chests: "Pistons may push chests"
+  record: "Block changes here are written to the log"
+info:
+  title: "§b[Protect] ${0} (${1}, ${2}, ${3})"
+  row: "§e${0} §7- ${1} §8| §7${2}"
+status: "§b[Protect] State: ${0}§b; ${1} settings; region plugin: ${2}§b; land plugin: ${3}"
+show:
+  title: "§b[Protect] Settings of ${0}, ${1} in all:"
+  row: "§e${0} §7- §f${1} ${2}"
+  enforced: "§6(enforced)"

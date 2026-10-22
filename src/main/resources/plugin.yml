@@ -1,0 +1,13 @@
+name: tokaProtect
+main: dev.toka.protect.Main
+version: "0.1.0"
+api: ["1.0.4"]
+load: POSTWORLD
+softdepend: [tokaRegions, tokaLand]
+permissions:
+  tokaprotect.use:
+    description: 查看腳下的保護規則
+    default: true
+  tokaprotect.admin:
+    description: 設定世界、區域、領地的保護旗標
+    default: op
