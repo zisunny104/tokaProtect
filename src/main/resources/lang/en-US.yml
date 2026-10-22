@@ -16,7 +16,16 @@ layer:
   claim: "claim ${0}"
   default: "default"
 help:
-  title: "§6=== §f§lProtect Help§r §6==="
+  title: "§6=== §f§l${0} help§r §6==="
+  index: "§e/${0} help ${1} §7- §b${2} (${3})"
+  section: "§6--- §f${0}§r §7page ${1}/${2} §6---"
+  next: "§8Next page: /${0} help ${1} ${2}"
+  unknown: "§eNo help section \"${0}\"; type /${1} help."
+  sec:
+    read: "Look at the rules"
+    flags: "Change flags"
+    log: "Block and command logs"
+    rollback: "Undo block changes"
   flags: "§e/protect flags §7- §bList every flag with its default"
   info: "§e/protect info §7- §bShow each flag under your feet and which layer decided it"
   status: "§e/protect status §7- §bShow whether it is active and how many settings exist"

@@ -16,13 +16,22 @@ public final class ProtectCommand extends Command {
     private static final String[] LAYERS = {"world", "region", "claim"};
     private static final String[] VALUES = {"allow", "deny", "inherit"};
     private final Main plugin;
+    private final HelpPages help;
 
     public ProtectCommand(Main plugin) {
         super("protect", "全服保護", "/protect help");
         this.plugin = plugin;
+        setAliases(new String[]{"ptc"});
+        help = new HelpPages("protect", List.of(
+                new HelpPages.Section("read", null, List.of("flags", "info")),
+                new HelpPages.Section("flags", "tokaprotect.admin", List.of("status", "show", "set", "layers", "enforce", "reset")),
+                new HelpPages.Section("log", "tokaprotect.admin", List.of("log", "logCheck", "logPlayer", "logCommands", "logStats")),
+                new HelpPages.Section("rollback", "tokaprotect.admin", List.of("rollback"))), plugin::text);
         setPermission("tokaprotect.use;tokaprotect.admin");
         getCommandParameters().clear();
-        addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help", "status", "flags", "info"})});
+        addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status", "flags", "info"})});
+        addCommandParameters("help", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"}),
+                CommandParameter.newEnum("section", true, new String[]{"read", "flags", "log", "rollback"}), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("log", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
                 CommandParameter.newEnum("what", new String[]{"here", "check", "stats"}), CommandParameter.newType("radius", true, CommandParamType.INT),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
@@ -54,7 +63,7 @@ public final class ProtectCommand extends Command {
         String action = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
         try {
             switch (action) {
-                case "help" -> help(sender);
+                case "help" -> help.show(sender, args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0]);
                 case "flags" -> flags(sender);
                 case "info" -> info(sender);
                 case "status" -> { admin(sender); status(sender); }
@@ -77,12 +86,6 @@ public final class ProtectCommand extends Command {
 
     private void admin(CommandSender sender) {
         if (!sender.hasPermission("tokaprotect.admin")) throw new SecurityException();
-    }
-
-    private void help(CommandSender sender) {
-        send(sender, "help.title");
-        for (String key : List.of("flags", "info")) send(sender, "help." + key);
-        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce", "log", "logCheck", "logPlayer", "logCommands", "logStats", "rollback")) send(sender, "help." + key);
     }
 
     private void flags(CommandSender sender) {

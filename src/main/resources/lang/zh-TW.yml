@@ -16,7 +16,16 @@ layer:
   claim: "領地 ${0}"
   default: "預設"
 help:
-  title: "§6=== §f§l保護 說明§r §6==="
+  title: "§6=== §f§l${0} 說明§r §6==="
+  index: "§e/${0} help ${1} §7- §b${2}（${3} 項）"
+  section: "§6--- §f${0}§r §7第 ${1}/${2} 頁 §6---"
+  next: "§8下一頁：/${0} help ${1} ${2}"
+  unknown: "§e沒有「${0}」這個說明區段，輸入 /${1} help 查看。"
+  sec:
+    read: "查看規則"
+    flags: "設定旗標"
+    log: "方塊與指令紀錄"
+    rollback: "還原方塊"
   flags: "§e/protect flags §7- §b列出所有旗標與預設值"
   info: "§e/protect info §7- §b查看腳下每個旗標是否允許，以及由哪一層決定"
   status: "§e/protect status §7- §b查看啟用狀態與設定數量"
