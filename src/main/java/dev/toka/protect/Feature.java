@@ -12,6 +12,8 @@ public enum Feature {
     /** Water, lava, fire and pistons outside claims. Needs to know where claims are, so it only runs in full mode. */
     HAZARDS("hazards", true),
     PISTONS("pistons", false),
+    /** Flight for permitted players where the fly flag allows it, and stopping flight nobody allowed. Needs no other plugin. */
+    FLIGHT("flight", false),
     /** Writing block changes to the log. Needs no other plugin. */
     RECORD("record", false),
     /** Keeping a record of commands and sign text. Needs no other plugin. */

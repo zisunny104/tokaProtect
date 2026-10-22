@@ -25,6 +25,8 @@ public enum Flag {
     UNCLAIMED_PISTONS("unclaimed-pistons", false),
     /** Pistons may push or pull chests. */
     PISTON_CHESTS("piston-chests", false),
+    /** Players holding the fly permission may fly here (survival and adventure). Who may is a permission; where is this flag. */
+    FLY("fly", false),
     /** Block changes here are written to the log. */
     RECORD("record", true);
 

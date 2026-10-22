@@ -13,6 +13,11 @@ features:
   pvp: true
   hazards: true
   pistons: true
+  flight: true
+# 飛行：誰能飛由權限 tokaprotect.fly 決定（可交給身分組），哪裡能飛由 fly 旗標決定（預設不開）。
+# 沒被允許卻在飛（生存、冒險模式）時取消，kick-illegal 為 true 時再踢出；有 tokaprotect.fly.bypass 的不受影響。
+flight:
+  kick-illegal: true
 # 某個功能在時間窗內連續出錯達次數，就自動停用該功能，其他功能照常；修好後用 /protect reset <功能> 重新啟用。
 breaker:
   failures: 5

@@ -89,6 +89,8 @@ public final class Main extends PluginBase implements Listener {
             } else {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
+            if (mode.enforces() && enabled.contains(Feature.FLIGHT))
+                getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", true)), this);
             if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
             if (mode.enforces() && enabled.contains(Feature.AUDIT)) startAudit(config, pluginDirectory);
             command = new ProtectCommand(this);

@@ -11,3 +11,9 @@ permissions:
   tokaprotect.admin:
     description: 設定世界、區域、領地的保護旗標
     default: op
+  tokaprotect.fly:
+    description: 在 fly 旗標允許的位置可以飛行（生存、冒險模式）
+    default: false
+  tokaprotect.fly.bypass:
+    description: 不受非法飛行檢查影響
+    default: op

@@ -43,6 +43,7 @@ flag:
   unclaimed-fire: "Fire may exist outside claims; when denied it is removed"
   unclaimed-pistons: "Pistons may exist outside claims; when denied they are removed"
   piston-chests: "Pistons may push chests"
+  fly: "Players with tokaprotect.fly may fly here"
   record: "Block changes here are written to the log"
 info:
   title: "§b[Protect] ${0} (${1}, ${2}, ${3})"

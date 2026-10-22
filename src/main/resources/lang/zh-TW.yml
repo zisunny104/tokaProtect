@@ -43,6 +43,7 @@ flag:
   unclaimed-fire: "火可以出現在領地外，拒絕時會被清除"
   unclaimed-pistons: "活塞可以出現在領地外，拒絕時會被清除"
   piston-chests: "活塞可以推動箱子"
+  fly: "有 tokaprotect.fly 權限的玩家可以在這裡飛行"
   record: "這裡的方塊變更要寫入紀錄"
 info:
   title: "§b[保護] ${0} (${1}, ${2}, ${3})"
