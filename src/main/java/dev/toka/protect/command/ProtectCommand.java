@@ -29,14 +29,18 @@ public final class ProtectCommand extends Command {
                 new HelpPages.Section("rollback", "tokaprotect.admin", List.of("rollback"))), plugin::text);
         setPermission("tokaprotect.use;tokaprotect.admin");
         getCommandParameters().clear();
-        addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status", "flags", "info"})});
+        addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"flags", "info"})});
+        addCommandParameters("status", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status"})});
         addCommandParameters("help", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"}),
                 CommandParameter.newEnum("section", true, new String[]{"read", "flags", "log", "rollback"}), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("log", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
                 CommandParameter.newEnum("what", new String[]{"here", "check", "stats"}), CommandParameter.newType("radius", true, CommandParamType.INT),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("logPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
-                CommandParameter.newEnum("what", new String[]{"player", "commands"}), CommandParameter.newType("name", CommandParamType.STRING),
+                CommandParameter.newEnum("what", new String[]{"player"}), CommandParameter.newType("name", CommandParamType.STRING),
+                CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("logCommands", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
+                CommandParameter.newEnum("what", new String[]{"commands"}), CommandParameter.newType("name", true, CommandParamType.STRING),
                 CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
         addCommandParameters("rollbackHere", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
                 CommandParameter.newEnum("what", new String[]{"here"}), CommandParameter.newType("radius", true, CommandParamType.INT),
@@ -77,9 +81,21 @@ public final class ProtectCommand extends Command {
         } catch (SecurityException denied) {
             send(sender, "cmd.denied");
         } catch (IllegalArgumentException | IOException failure) {
-            send(sender, "cmd.failed", failure.getMessage());
+            send(sender, "cmd.failed", describe(sender, failure));
         }
         return true;
+    }
+
+    private static final Set<String> CODES = Set.of("USAGE", "LOG_OFF", "AUDIT_OFF", "PLAYER_ONLY", "RADIUS", "ROLLBACK_RUNNING", "REGION_UNKNOWN", "WORLD_UNKNOWN",
+            "UNKNOWN_FLAG", "UNKNOWN_FEATURE", "LOG_PLAYER_UNKNOWN");
+
+    /** The reason in words: known codes and number or id mistakes get a sentence, anything else is shown as it is. */
+    private String describe(CommandSender sender, Exception failure) {
+        String message = String.valueOf(failure.getMessage());
+        if (CODES.contains(message)) return plugin.text(sender, "err." + message);
+        if (failure instanceof NumberFormatException) return plugin.text(sender, "err.NUMBER");
+        if (message.startsWith("Invalid UUID")) return plugin.text(sender, "err.CLAIM_ID");
+        return message;
     }
 
     private String word(CommandSender sender, boolean allowed) { return plugin.text(sender, allowed ? "word.allow" : "word.deny"); }

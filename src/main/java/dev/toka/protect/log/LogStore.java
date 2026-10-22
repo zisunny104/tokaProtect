@@ -32,8 +32,8 @@ public final class LogStore implements AutoCloseable {
     private final Connection db;
     private final Map<String, Integer> worlds = new HashMap<>();
     private final Map<String, Integer> causes = new HashMap<>();
-    private final Map<UUID, Integer> actorIds = new HashMap<>();
-    private final Map<UUID, String> actorNames = new HashMap<>();
+    private final Map<UUID, Integer> actorIds = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, String> actorNames = new java.util.concurrent.ConcurrentHashMap<>();
 
     public LogStore(Path file) throws SQLException, IOException {
         this.file = file;
@@ -198,7 +198,7 @@ public final class LogStore implements AutoCloseable {
     }
 
     /** The player with this last known name (any case), if exactly one. */
-    public synchronized Optional<UUID> playerByName(String name) {
+    public Optional<UUID> playerByName(String name) {
         UUID found = null;
         for (var entry : actorNames.entrySet()) {
             if (!entry.getValue().equalsIgnoreCase(name)) continue;

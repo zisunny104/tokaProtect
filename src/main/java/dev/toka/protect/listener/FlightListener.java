@@ -66,22 +66,36 @@ public final class FlightListener implements Listener {
     }
 
     private void apply(Player player, Location at) {
-        if (!breaker.working(Feature.FLIGHT) || !walking(player)) return;
         boolean has = granted.contains(player.getUniqueId());
+        // A tripped feature takes back the flight it gave instead of leaving it on everywhere.
+        if (!breaker.working(Feature.FLIGHT)) { if (has) revoke(player); return; }
+        if (!walking(player)) return;
         if (!has && !player.hasPermission(PERMISSION)) return;
         boolean want = shouldFly(player.hasPermission(PERMISSION), placeAllows(at));
         if (want == has) return;
-        AdventureSettings settings = player.getAdventureSettings();
         if (want) {
             granted.add(player.getUniqueId());
+            AdventureSettings settings = player.getAdventureSettings();
             settings.set(AdventureSettings.Type.ALLOW_FLIGHT, true);
+            settings.update();
         } else {
-            granted.remove(player.getUniqueId());
-            if (settings.get(AdventureSettings.Type.FLYING)) landing.put(player.getUniqueId(), System.currentTimeMillis() + LANDING_MILLIS);
-            settings.set(AdventureSettings.Type.ALLOW_FLIGHT, false);
-            settings.set(AdventureSettings.Type.FLYING, false);
+            revoke(player);
         }
+    }
+
+    /** Takes back flight this listener gave; a player in the air lands without fall damage. */
+    private void revoke(Player player) {
+        if (!granted.remove(player.getUniqueId())) return;
+        AdventureSettings settings = player.getAdventureSettings();
+        if (settings.get(AdventureSettings.Type.FLYING)) landing.put(player.getUniqueId(), System.currentTimeMillis() + LANDING_MILLIS);
+        settings.set(AdventureSettings.Type.ALLOW_FLIGHT, false);
+        settings.set(AdventureSettings.Type.FLYING, false);
         settings.update();
+    }
+
+    /** For when the plugin stops: nobody keeps flight that only this listener allowed. */
+    public void release() {
+        for (Player player : plugin.getServer().getOnlinePlayers().values()) if (granted.contains(player.getUniqueId())) revoke(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -115,6 +129,7 @@ public final class FlightListener implements Listener {
         if (until != null && until >= System.currentTimeMillis()) event.setCancelled();
     }
 
+    /** The new game mode brings its own flight settings, so what was given here is simply forgotten. */
     @EventHandler public void onGameMode(PlayerGameModeChangeEvent event) { granted.remove(event.getPlayer().getUniqueId()); }
 
     @EventHandler public void onQuit(PlayerQuitEvent event) {

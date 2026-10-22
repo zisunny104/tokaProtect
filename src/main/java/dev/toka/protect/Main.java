@@ -55,6 +55,7 @@ public final class Main extends PluginBase implements Listener {
     private LogWriter<AuditRecord> auditWriter;
     private AuditView auditView;
     private Inspector inspector;
+    private dev.toka.protect.listener.FlightListener flight;
     private dev.toka.protect.rollback.Rollback rollback;
     private final Map<String, Messages> languages = new HashMap<>();
 
@@ -90,7 +91,7 @@ public final class Main extends PluginBase implements Listener {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
             if (mode.enforces() && enabled.contains(Feature.FLIGHT))
-                getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", true)), this);
+                getServer().getPluginManager().registerEvents(flight = new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", false)), this);
             if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
             if (mode.enforces() && enabled.contains(Feature.AUDIT)) startAudit(config, pluginDirectory);
             command = new ProtectCommand(this);
@@ -103,7 +104,7 @@ public final class Main extends PluginBase implements Listener {
                 getLogger().error("無法註冊指令 /protect；請檢查指令衝突。");
                 command = null;
             }
-        } catch (Exception error) {
+        } catch (Exception | LinkageError error) {
             getLogger().error("tokaProtect 未能載入；為避免以空資料覆蓋原資料，插件將停用。", error);
             getServer().getPluginManager().disablePlugin(this);
         }
@@ -136,7 +137,7 @@ public final class Main extends PluginBase implements Listener {
                     new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))), this);
             getServer().getPluginManager().registerEvents(inspector, this);
             getLogger().info("方塊紀錄啟用：保留 " + config.getInt("log.retention-days", 90) + " 天、最多 " + maxRows + " 筆。");
-        } catch (Exception failure) {
+        } catch (Exception | LinkageError failure) {
             getLogger().error("方塊紀錄無法啟動，已關閉；其他保護功能照常。", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
             without.addAll(enabled);
@@ -166,7 +167,7 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(new AuditListener(this, auditWriter, breaker, hidden, config.getInt("audit.max-text", 256),
                     new dev.toka.protect.link.DiscordSender(getServer()), config.getString("audit.discord-channel", "cmd"), config.getBoolean("audit.discord", false)), this);
             getLogger().info("指令稽核啟用：保留 " + config.getInt("audit.retention-days", 30) + " 天、最多 " + maxRows + " 筆。");
-        } catch (Exception failure) {
+        } catch (Exception | LinkageError failure) {
             getLogger().error("指令稽核無法啟動，已關閉；其他保護功能照常。", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
             without.addAll(enabled);
@@ -188,6 +189,7 @@ public final class Main extends PluginBase implements Listener {
             command.unregister(commands);
         }
         if (instance == this) instance = null;
+        if (flight != null) flight.release();
         if (auditWriter != null) auditWriter.close();
         if (auditView != null) {
             auditView.close();

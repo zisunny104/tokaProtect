@@ -15,8 +15,8 @@ import java.util.Map;
 public final class RollbackPlan {
     private RollbackPlan() {}
 
-    /** @param expectedId the block id that must be there now for the restore to be safe */
-    public record Entry(String world, int x, int y, int z, int restoreId, int restoreMeta, byte[] restoreNbt, int expectedId) {}
+    /** @param expectedId the block id and state value that must be there now for the restore to be safe */
+    public record Entry(String world, int x, int y, int z, int restoreId, int restoreMeta, byte[] restoreNbt, int expectedId, int expectedMeta) {}
 
     /** What a change leaves behind: placed, poured and lit things stay; broken, scooped and blown-up things leave air. */
     static int[] after(LogStore.Row row) {
@@ -40,7 +40,7 @@ public final class RollbackPlan {
             LogStore.Row first = span.first();
             // Putting back what is already there would change nothing.
             if (first.prevBlock() == now[0] && first.prevMeta() == now[1] && first.prevNbt() == null) continue;
-            entries.add(new Entry(first.world(), first.x(), first.y(), first.z(), first.prevBlock(), first.prevMeta(), first.prevNbt(), now[0]));
+            entries.add(new Entry(first.world(), first.x(), first.y(), first.z(), first.prevBlock(), first.prevMeta(), first.prevNbt(), now[0], now[1]));
         }
         return entries;
     }

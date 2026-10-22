@@ -97,7 +97,7 @@ public final class Rollback implements AutoCloseable {
                         if (apply(entries.get(at))) restored++; else skipped++;
                     }
                     if (at < entries.size()) return;
-                } catch (RuntimeException failure) {
+                } catch (RuntimeException | LinkageError failure) {
                     plugin.getLogger().warning("方塊還原中斷：" + failure);
                 }
                 getHandler().cancel();
@@ -113,7 +113,8 @@ public final class Rollback implements AutoCloseable {
         Level level = plugin.getServer().getLevelByName(entry.world());
         if (level == null) return false;
         Vector3 at = new Vector3(entry.x(), entry.y(), entry.z());
-        if (level.getBlock(at).getId() != entry.expectedId()) return false;
+        var now = level.getBlock(at);
+        if (now.getId() != entry.expectedId() || now.getDamage() != entry.expectedMeta()) return false;
         level.setBlock(at, Block.get(entry.restoreId(), entry.restoreMeta()), false, true);
         TileNbt.restore(level, entry.x(), entry.y(), entry.z(), entry.restoreNbt());
         return true;
