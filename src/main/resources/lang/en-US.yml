@@ -23,6 +23,7 @@ help:
   show: "§e/protect show <world|region|claim> <target> §7- §bList a layer's settings"
   set: "§e/protect set <world|region|claim> <target> <flag> <allow|deny|inherit> [enforce] §7- §bChange a flag on one layer"
   layers: "§8Target: a world's folder name, a region's name or a claim's id. Narrower wins: claim > region > world > default."
+  reset: "§e/protect reset <feature> §7- §bTurn a feature back on after it was switched off automatically"
   enforce: "§8enforce stops layers below from overriding it. inherit clears the setting and follows the layer above."
 flags:
   title: "§6=== §f§lProtect Flags§r §6==="
@@ -40,8 +41,13 @@ flag:
 info:
   title: "§b[Protect] ${0} (${1}, ${2}, ${3})"
   row: "§e${0} §7- ${1} §8| §7${2}"
-status: "§b[Protect] State: ${0}§b; ${1} settings; region plugin: ${2}§b; land plugin: ${3}"
 show:
   title: "§b[Protect] Settings of ${0}, ${1} in all:"
   row: "§e${0} §7- §f${1} ${2}"
   enforced: "§6(enforced)"
+status: "§b[Protect] Mode: ${0}§b; ${1} settings; region plugin: ${2}§b; land plugin: ${3}"
+feature:
+  row: "§e${0} §7- ${1}"
+  off: "§7off (not enabled by mode or setting)"
+  running: "§arunning (${0} recent failures)"
+  tripped: "§cswitched off automatically: ${0}"

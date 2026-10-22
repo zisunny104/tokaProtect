@@ -13,7 +13,7 @@ public final class Rules {
     public interface Places {
         /** The region id at the block, or null. */
         String regionAt(String world, int x, int y, int z);
-        /** The claims at the block. */
+        /** The claims at the block, or null when that cannot be known (no land plugin, or it failed): never guess "none". */
         List<Claim> claimsAt(String world, int x, int y, int z);
     }
 
@@ -51,14 +51,16 @@ public final class Rules {
             return Resolver.resolve(current, flag, world, null, List.of(), List.of());
         String region = places.regionAt(world, x, y, z);
         List<Claim> claims = places.claimsAt(world, x, y, z);
+        if (claims == null) claims = List.of();
         List<String> ids = claims.stream().map(Claim::id).toList();
         List<String> granting = grantingType == null ? List.of()
                 : claims.stream().filter(c -> grantingType.equals(c.type())).map(Claim::id).toList();
         return Resolver.resolve(current, flag, world, region, ids, granting);
     }
 
-    /** True when no claim covers the block. */
+    /** True only when claims are known and none covers the block; if claims cannot be known the block is not called unclaimed. */
     public boolean unclaimed(String world, int x, int y, int z) {
-        return places.claimsAt(world, x, y, z).isEmpty();
+        List<Claim> claims = places.claimsAt(world, x, y, z);
+        return claims != null && claims.isEmpty();
     }
 }

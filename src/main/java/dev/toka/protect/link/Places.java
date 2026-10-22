@@ -65,10 +65,11 @@ public final class Places implements Rules.Places {
 
     @Override public List<Rules.Claim> claimsAt(String world, int x, int y, int z) {
         Method lookup = claimsAt;
-        if (lookup == null) return List.of();
+        if (lookup == null) return null;
         try {
             String json = (String) lookup.invoke(null, world, x, y, z);
-            if (json == null || json.equals("[]")) return List.of();
+            if (json == null) return null;
+            if (json.equals("[]")) return List.of();
             List<Rules.Claim> claims = new ArrayList<>();
             for (var row : JsonParser.parseString(json).getAsJsonArray()) {
                 var claim = row.getAsJsonObject();
@@ -76,7 +77,7 @@ public final class Places implements Rules.Places {
             }
             return claims;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError unavailable) {
-            return List.of();
+            return null;
         }
     }
 }

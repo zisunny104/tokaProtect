@@ -55,4 +55,24 @@ public class RulesTest {
         rules.table(rules.table().with(Layer.world("w"), Flag.EXPLOSIONS, new Setting(Setting.Value.ALLOW, false)));
         assertTrue(rules.allowed(Flag.EXPLOSIONS, "w", 0, 0, 0));
     }
+
+    @Test public void claimsThatCannotBeKnownAreNeverCalledUnclaimed() {
+        var places = new CountingPlaces();
+        places.claims = null;
+        var rules = new Rules(places, FlagTable.empty());
+        assertFalse(rules.unclaimed("w", 0, 0, 0));
+        // And a flag that needs them still resolves, falling back to the layers it can see.
+        assertFalse(rules.allowed(Flag.PVP, "w", 0, 0, 0));
+    }
+
+    @Test public void withoutRegionsOrClaimsOnlyTheWorldAndTheDefaultCount() {
+        Rules.Places none = new Rules.Places() {
+            public String regionAt(String world, int x, int y, int z) { return null; }
+            public List<Rules.Claim> claimsAt(String world, int x, int y, int z) { return null; }
+        };
+        var table = FlagTable.empty().with(Layer.world("w"), Flag.EXPLOSIONS, new Setting(Setting.Value.ALLOW, false))
+                .with(Layer.region("r"), Flag.EXPLOSIONS, new Setting(Setting.Value.DENY, false));
+        var rules = new Rules(none, table);
+        assertTrue(rules.allowed(Flag.EXPLOSIONS, "w", 0, 0, 0));
+    }
 }

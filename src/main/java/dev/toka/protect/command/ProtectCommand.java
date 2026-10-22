@@ -5,6 +5,7 @@ import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import dev.toka.protect.Feature;
 import dev.toka.protect.Main;
 import dev.toka.protect.flag.*;
 import java.io.IOException;
@@ -22,6 +23,8 @@ public final class ProtectCommand extends Command {
         setPermission("tokaprotect.use;tokaprotect.admin");
         getCommandParameters().clear();
         addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help", "status", "flags", "info"})});
+        addCommandParameters("reset", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"reset"}),
+                CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
         addCommandParameters("show", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"show"}),
                 CommandParameter.newEnum("layer", LAYERS), CommandParameter.newType("target", CommandParamType.STRING)});
         addCommandParameters("set", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"set"}),
@@ -41,6 +44,7 @@ public final class ProtectCommand extends Command {
                 case "flags" -> flags(sender);
                 case "info" -> info(sender);
                 case "status" -> { admin(sender); status(sender); }
+                case "reset" -> { admin(sender); reset(sender, args); }
                 case "show" -> { admin(sender); show(sender, args); }
                 case "set" -> { admin(sender); set(sender, args); }
                 default -> send(sender, "cmd.usage");
@@ -62,7 +66,7 @@ public final class ProtectCommand extends Command {
     private void help(CommandSender sender) {
         send(sender, "help.title");
         for (String key : List.of("flags", "info")) send(sender, "help." + key);
-        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "show", "set", "layers", "enforce")) send(sender, "help." + key);
+        if (sender.hasPermission("tokaprotect.admin")) for (String key : List.of("status", "reset", "show", "set", "layers", "enforce")) send(sender, "help." + key);
     }
 
     private void flags(CommandSender sender) {
@@ -85,8 +89,20 @@ public final class ProtectCommand extends Command {
 
     private void status(CommandSender sender) {
         int settings = plugin.rules().table().all().values().stream().mapToInt(Map::size).sum();
-        send(sender, "status", plugin.text(sender, plugin.active() ? "word.on" : "word.standby"), settings,
+        send(sender, "status", plugin.mode().name().toLowerCase(Locale.ROOT), settings,
                 plugin.text(sender, plugin.places().hasRegions() ? "word.yes" : "word.no"), plugin.text(sender, plugin.places().hasClaims() ? "word.yes" : "word.no"));
+        for (Feature feature : Feature.values()) {
+            var state = plugin.breaker().state(feature);
+            String how = !plugin.enabled().contains(feature) ? plugin.text(sender, "feature.off")
+                    : state.tripped() ? plugin.text(sender, "feature.tripped", state.lastError()) : plugin.text(sender, "feature.running", state.recentFailures());
+            send(sender, "feature.row", feature.id(), how);
+        }
+    }
+
+    private void reset(CommandSender sender, String[] args) {
+        Feature feature = Feature.byId(need(args, 1)).orElseThrow(() -> new IllegalArgumentException("UNKNOWN_FEATURE"));
+        plugin.breaker().reset(feature);
+        send(sender, "done");
     }
 
     private void show(CommandSender sender, String[] args) {

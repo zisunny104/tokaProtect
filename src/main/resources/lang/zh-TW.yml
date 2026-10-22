@@ -23,6 +23,7 @@ help:
   show: "§e/protect show <world|region|claim> <目標> §7- §b列出該層的設定"
   set: "§e/protect set <world|region|claim> <目標> <旗標> <allow|deny|inherit> [enforce] §7- §b設定一層的旗標"
   layers: "§8目標：世界填世界資料夾名稱、區域填區域名稱、領地填領地 ID。越小的層級優先：領地 > 區域 > 世界 > 預設。"
+  reset: "§e/protect reset <功能> §7- §b重新啟用被自動停用的功能"
   enforce: "§8加上 enforce 表示強制：下層不能覆蓋。inherit 表示不設定，跟著上一層。"
 flags:
   title: "§6=== §f§l保護旗標§r §6==="
@@ -40,8 +41,13 @@ flag:
 info:
   title: "§b[保護] ${0} (${1}, ${2}, ${3})"
   row: "§e${0} §7- ${1} §8| §7${2}"
-status: "§b[保護] 狀態：${0}§b；已設定 ${1} 筆；區域插件：${2}§b；領地插件：${3}"
 show:
   title: "§b[保護] ${0} 的設定，共 ${1} 筆："
   row: "§e${0} §7- §f${1} ${2}"
   enforced: "§6（強制）"
+status: "§b[保護] 模式：${0}§b；已設定 ${1} 筆；區域插件：${2}§b；領地插件：${3}"
+feature:
+  row: "§e${0} §7- ${1}"
+  off: "§7關閉（設定或模式未啟用）"
+  running: "§a運作中（近期出錯 ${0} 次）"
+  tripped: "§c已自動停用：${0}"

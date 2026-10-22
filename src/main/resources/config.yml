@@ -1,7 +1,20 @@
 language: zh-TW
-# 待命＝false：不攔截任何事件，只能用 /protect 預先設定旗標。
-# 確認 zero 的舊保護規則（Protect、block-log 的保護部分、領地外清除）已停用後才改為 true。
-active: false
+# standby：待命，不攔截任何事件，只能用 /protect 預先設定旗標。
+# minimal：最小運作，只用本插件自己的資料（世界層旗標與預設值），不依賴 tokaRegions／tokaLand，其中一個壞了也不受影響。
+# full：完整接管，加上區域層、領地層與領地外清除。
+# 改成 minimal 或 full 前，請先確認 zero 的舊保護規則（Protect、block-log 的保護部分、領地外清除）已停用。
+mode: standby
+# 各功能可單獨關閉（minimal 時 hazards 本來就不運作）。
+features:
+  explosions: true
+  farmland: true
+  pvp: true
+  hazards: true
+  pistons: true
+# 某個功能在時間窗內連續出錯達次數，就自動停用該功能，其他功能照常；修好後用 /protect reset <功能> 重新啟用。
+breaker:
+  failures: 5
+  window-seconds: 60
 storage:
   backend: SQLITE
   schema-version: 1

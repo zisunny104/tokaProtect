@@ -18,7 +18,11 @@ import dev.toka.storage.DocumentStore;
 import dev.toka.storage.StoreConfig;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 
@@ -32,7 +36,9 @@ public final class Main extends PluginBase implements Listener {
     private Places places;
     private Rules rules;
     private ProtectCommand command;
-    private boolean active;
+    private Mode mode = Mode.STANDBY;
+    private Breaker breaker;
+    private Set<Feature> enabled = Set.of();
     private final Map<String, Messages> languages = new HashMap<>();
 
     @Override public void onEnable() {
@@ -45,15 +51,25 @@ public final class Main extends PluginBase implements Listener {
             Backend backend = Backend.valueOf(config.getString("storage.backend", "SQLITE").strip().toUpperCase(Locale.ROOT));
             store = DocumentStore.open(new StoreConfig(backend, directory, config.getInt("storage.schema-version", 1)));
             repository = new FlagRepository(store);
+            mode = Mode.parse(config.getString("mode", "standby"));
+            // Minimal mode never touches another plugin: it has no places to look in, so only world settings and defaults count.
             places = new Places(getServer());
-            rules = new Rules(places, repository.load());
-            active = config.getBoolean("active", false);
+            Rules.Places lookup = mode.usesRegionsAndClaims() ? places : new Rules.Places() {
+                public String regionAt(String world, int x, int y, int z) { return null; }
+                public List<Rules.Claim> claimsAt(String world, int x, int y, int z) { return null; }
+            };
+            rules = new Rules(lookup, repository.load());
+            breaker = new Breaker(config.getInt("breaker.failures", 5), config.getInt("breaker.window-seconds", 60) * 1000L, System::currentTimeMillis);
+            EnumSet<Feature> chosen = EnumSet.noneOf(Feature.class);
+            for (Feature feature : Feature.values())
+                if (mode.allows(feature) && config.getBoolean("features." + feature.id(), true)) chosen.add(feature);
+            enabled = Collections.unmodifiableSet(chosen);
             getServer().getPluginManager().registerEvents(this, this);
-            if (active) {
-                getServer().getPluginManager().registerEvents(new WorldListener(this, rules), this);
-                getLogger().warning("tokaProtect 已啟用：請確認 zero 的舊保護規則已停用，否則兩邊會同時攔截。");
+            if (mode.enforces()) {
+                getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
+                getLogger().warning("tokaProtect 已啟用（" + mode + "）：" + enabled + "。請確認 zero 的舊保護規則已停用，否則兩邊會同時攔截。");
             } else {
-                getLogger().info("tokaProtect 待命中：active 為 false，不攔截任何事件。");
+                getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
             command = new ProtectCommand(this);
             var commands = getServer().getCommandMap();
@@ -86,7 +102,10 @@ public final class Main extends PluginBase implements Listener {
         if (store != null) try { store.close(); } catch (IOException error) { getLogger().error("關閉保護儲存庫失敗。", error); }
     }
 
-    public boolean active() { return active; }
+    public Mode mode() { return mode; }
+    public Breaker breaker() { return breaker; }
+    /** The features switched on by the mode and the configuration; one that has tripped is still listed here. */
+    public Set<Feature> enabled() { return enabled; }
     public Rules rules() { return rules; }
     public Places places() { return places; }
 
