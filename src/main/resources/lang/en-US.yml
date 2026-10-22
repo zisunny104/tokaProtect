@@ -6,10 +6,8 @@ done: "§a[Protect] Done."
 word:
   allow: "§aallowed"
   deny: "§cdenied"
-  on: "§aactive"
-  standby: "§estandby"
-  yes: "§ayes"
-  no: "§7no"
+  "yes": "§ayes"
+  "no": "§7no"
 layer:
   world: "world ${0}"
   region: "region ${0}"
@@ -64,7 +62,7 @@ show:
 status: "§b[Protect] Mode: ${0}§b; ${1} settings; region plugin: ${2}§b; land plugin: ${3}"
 feature:
   row: "§e${0} §7- ${1}"
-  off: "§7off (not enabled by mode or setting)"
+  "off": "§7off (not enabled by mode or setting)"
   running: "§arunning (${0} recent failures)"
   tripped: "§cswitched off automatically: ${0}"
 log:

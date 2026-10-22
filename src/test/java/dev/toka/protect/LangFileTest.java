@@ -36,4 +36,17 @@ public class LangFileTest {
         var keys = keys("zh-TW.yml");
         for (dev.toka.protect.log.Action action : dev.toka.protect.log.Action.values()) assertTrue(action.name(), keys.contains(action.langKey()));
     }
+
+    private static void noBooleanKeys(Object node, String path) {
+        if (!(node instanceof Map<?, ?> map)) return;
+        for (var entry : map.entrySet()) {
+            assertTrue("YAML turned the key into a boolean under " + path + " (quote on/off/yes/no): " + entry.getKey(), entry.getKey() instanceof String);
+            noBooleanKeys(entry.getValue(), path + "." + entry.getKey());
+        }
+    }
+
+    @Test public void noKeyIsReadAsABoolean() throws Exception {
+        for (String file : new String[]{"zh-TW.yml", "en-US.yml"})
+            try (InputStream in = LangFileTest.class.getResourceAsStream("/lang/" + file)) { noBooleanKeys(new Yaml().load(in), file); }
+    }
 }

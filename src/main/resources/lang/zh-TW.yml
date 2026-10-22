@@ -6,10 +6,8 @@ done: "§a[保護] 完成。"
 word:
   allow: "§a允許"
   deny: "§c拒絕"
-  on: "§a啟用"
-  standby: "§e待命"
-  yes: "§a有"
-  no: "§7無"
+  "yes": "§a有"
+  "no": "§7無"
 layer:
   world: "世界 ${0}"
   region: "區域 ${0}"
@@ -64,7 +62,7 @@ show:
 status: "§b[保護] 模式：${0}§b；已設定 ${1} 筆；區域插件：${2}§b；領地插件：${3}"
 feature:
   row: "§e${0} §7- ${1}"
-  off: "§7關閉（設定或模式未啟用）"
+  "off": "§7關閉（設定或模式未啟用）"
   running: "§a運作中（近期出錯 ${0} 次）"
   tripped: "§c已自動停用：${0}"
 log:
