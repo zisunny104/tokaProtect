@@ -31,6 +31,7 @@ import java.util.Map;
  * Until {@code active} is true nothing is intercepted, so it never competes with the rules it is meant to replace.
  */
 public final class Main extends PluginBase implements Listener {
+    private static volatile Main instance;
     private DocumentStore store;
     private FlagRepository repository;
     private Places places;
@@ -42,6 +43,7 @@ public final class Main extends PluginBase implements Listener {
     private final Map<String, Messages> languages = new HashMap<>();
 
     @Override public void onEnable() {
+        instance = this;
         saveDefaultConfig();
         try {
             var config = getConfig();
@@ -99,7 +101,17 @@ public final class Main extends PluginBase implements Listener {
             commands.getCommands().entrySet().removeIf(entry -> entry.getValue() == command);
             command.unregister(commands);
         }
+        if (instance == this) instance = null;
         if (store != null) try { store.close(); } catch (IOException error) { getLogger().error("關閉保護儲存庫失敗。", error); }
+    }
+
+    /**
+     * Whether tokaProtect is deciding pvp right now: it is running with the pvp feature on and not tripped. Other plugins that
+     * can also settle pvp (tokaLand) step aside while this is true and resume when it is not.
+     */
+    public static boolean handlesPvp() {
+        Main main = instance;
+        return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
     }
 
     public Mode mode() { return mode; }
