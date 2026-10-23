@@ -84,6 +84,7 @@ public final class Main extends PluginBase implements Listener {
                 if (mode.allows(feature) && config.getBoolean("features." + feature.id(), true)) chosen.add(feature);
             enabled = Collections.unmodifiableSet(chosen);
             getServer().getPluginManager().registerEvents(this, this);
+            getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.PlayerListener(config.getBoolean("player.keep-inventory", true), config.getBoolean("player.keep-experience", true), config.getBoolean("player.check-movement", false)), this);
             if (mode.enforces()) {
                 getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
             }
