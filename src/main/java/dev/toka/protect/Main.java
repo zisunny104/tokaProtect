@@ -86,9 +86,6 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
             if (mode.enforces()) {
                 getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
-                getLogger().info("tokaProtect 已啟用（" + mode + "）：" + enabled + "");
-            } else {
-                getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
             if (mode.enforces() && enabled.contains(Feature.FLIGHT))
                 getServer().getPluginManager().registerEvents(flight = new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", false)), this);
@@ -136,7 +133,7 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000),
                     new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))), this);
             getServer().getPluginManager().registerEvents(inspector, this);
-            getLogger().info("方塊紀錄啟用：保留 " + config.getInt("log.retention-days", 90) + " 天、最多 " + dev.toka.protect.log.Num.group(maxRows) + " 筆。");
+            getLogger().info("§b方塊紀錄就緒：保留 §a" + config.getInt("log.retention-days", 90) + " §b天、最多 §a" + dev.toka.protect.log.Num.group(maxRows) + " §b筆");
         } catch (Exception | LinkageError failure) {
             getLogger().error("方塊紀錄無法啟動，已關閉；其他保護功能照常。", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
@@ -166,7 +163,7 @@ public final class Main extends PluginBase implements Listener {
             for (String name : config.getStringList("audit.hidden-commands")) hidden.add(name.toLowerCase(Locale.ROOT).replaceFirst("^/", ""));
             getServer().getPluginManager().registerEvents(new AuditListener(this, auditWriter, breaker, hidden, config.getInt("audit.max-text", 256),
                     new dev.toka.protect.link.DiscordSender(getServer()), config.getString("audit.discord-channel", "cmd"), config.getBoolean("audit.discord", false)), this);
-            getLogger().info("指令稽核啟用：保留 " + config.getInt("audit.retention-days", 30) + " 天、最多 " + dev.toka.protect.log.Num.group(maxRows) + " 筆。");
+            getLogger().info("§b指令稽核就緒：保留 §a" + config.getInt("audit.retention-days", 30) + " §b天、最多 §a" + dev.toka.protect.log.Num.group(maxRows) + " §b筆");
         } catch (Exception | LinkageError failure) {
             getLogger().error("指令稽核無法啟動，已關閉；其他保護功能照常。", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);

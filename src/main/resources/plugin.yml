@@ -1,6 +1,6 @@
 name: tokaProtect
 main: dev.toka.protect.Main
-version: "0.1.2"
+version: "0.1.4"
 api: ["1.0.4"]
 load: POSTWORLD
 softdepend: [tokaRegions, tokaLand]
