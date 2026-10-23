@@ -20,6 +20,8 @@ player:
   keep-inventory: true
   keep-experience: true
   check-movement: false
+  # 方塊的掉落物直接進背包（放不下的才掉在地上）；經驗值去修補穿著或手上有「修補」附魔的裝備，沒有就直接給玩家。
+  auto-pickup: true
 flight:
   kick-illegal: false
 # 某個功能在時間窗內連續出錯達次數，就自動停用該功能，其他功能照常；修好後用 /protect reset <功能> 重新啟用。

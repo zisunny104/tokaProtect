@@ -84,7 +84,7 @@ public final class Main extends PluginBase implements Listener {
                 if (mode.allows(feature) && config.getBoolean("features." + feature.id(), true)) chosen.add(feature);
             enabled = Collections.unmodifiableSet(chosen);
             getServer().getPluginManager().registerEvents(this, this);
-            getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.PlayerListener(config.getBoolean("player.keep-inventory", true), config.getBoolean("player.keep-experience", true), config.getBoolean("player.check-movement", false)), this);
+            getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.PlayerListener(config.getBoolean("player.keep-inventory", true), config.getBoolean("player.keep-experience", true), config.getBoolean("player.check-movement", false), config.getBoolean("player.auto-pickup", true)), this);
             if (mode.enforces()) {
                 getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
             }
@@ -216,6 +216,12 @@ public final class Main extends PluginBase implements Listener {
         Main main = instance;
         if (main == null || main.breaker == null) return false;
         return Feature.byId(featureId).filter(f -> main.enabled.contains(f) && main.breaker.working(f)).isPresent();
+    }
+
+    /** Whether broken blocks drop into the inventory from here. For zero's hand-over check, by reflection. */
+    public static boolean handlesAutoPickup() {
+        Main main = instance;
+        return main != null && main.getConfig().getBoolean("player.auto-pickup", true);
     }
 
     public LogView logView() { return logView; }
