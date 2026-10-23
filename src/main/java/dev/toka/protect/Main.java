@@ -86,7 +86,7 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
             if (mode.enforces()) {
                 getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
-                getLogger().info("tokaProtect 已啟用（" + mode + "）：" + enabled + "。zero 會自己驗證並關掉它重複的舊保護。");
+                getLogger().info("tokaProtect 已啟用（" + mode + "）：" + enabled + "");
             } else {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
