@@ -1,13 +1,17 @@
 package dev.toka.protect;
 
 import cn.nukkit.Player;
+import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.PluginCommand;
+import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.plugin.PluginEnableEvent;
 import cn.nukkit.plugin.PluginBase;
 import dev.toka.i18n.Messages;
 import dev.toka.protect.command.ProtectCommand;
+import dev.toka.protect.form.ProtectWindow;
 import dev.toka.protect.flag.FlagTable;
 import dev.toka.protect.flag.Rules;
 import dev.toka.protect.link.Places;
@@ -57,6 +61,9 @@ public final class Main extends PluginBase implements Listener {
     private Inspector inspector;
     private dev.toka.protect.listener.FlightListener flight;
     private dev.toka.protect.rollback.Rollback rollback;
+    private ProtectWindow windows;
+    /** Listeners made by wire(), so a reload can take them down. */
+    private final List<Listener> listeners = new java.util.ArrayList<>();
     private final Map<String, Messages> languages = new HashMap<>();
 
     @Override public void onEnable() {
@@ -70,43 +77,110 @@ public final class Main extends PluginBase implements Listener {
             Backend backend = Backend.valueOf(config.getString("storage.backend", "SQLITE").strip().toUpperCase(Locale.ROOT));
             store = DocumentStore.open(new StoreConfig(backend, directory, config.getInt("storage.schema-version", 1)));
             repository = new FlagRepository(store);
-            mode = Mode.parse(config.getString("mode", "full"));
-            // Minimal mode never touches another plugin: it has no places to look in, so only world settings and defaults count.
             places = new Places(getServer());
-            Rules.Places lookup = mode.usesRegionsAndClaims() ? places : new Rules.Places() {
-                public String regionAt(String world, int x, int y, int z) { return null; }
-                public List<Rules.Claim> claimsAt(String world, int x, int y, int z) { return null; }
-            };
-            rules = new Rules(lookup, repository.load());
-            breaker = new Breaker(config.getInt("breaker.failures", 5), config.getInt("breaker.window-seconds", 60) * 1000L, System::currentTimeMillis);
-            EnumSet<Feature> chosen = EnumSet.noneOf(Feature.class);
-            for (Feature feature : Feature.values())
-                if (mode.allows(feature) && config.getBoolean("features." + feature.id(), true)) chosen.add(feature);
-            enabled = Collections.unmodifiableSet(chosen);
             getServer().getPluginManager().registerEvents(this, this);
-            getServer().getPluginManager().registerEvents(new dev.toka.protect.listener.PlayerListener(config.getBoolean("player.keep-inventory", true), config.getBoolean("player.keep-experience", true), config.getBoolean("player.check-movement", false), config.getBoolean("player.auto-pickup", true)), this);
-            if (mode.enforces()) {
-                getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
-            }
-            if (mode.enforces() && enabled.contains(Feature.FLIGHT))
-                getServer().getPluginManager().registerEvents(flight = new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", false)), this);
-            if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
-            if (mode.enforces() && enabled.contains(Feature.AUDIT)) startAudit(config, pluginDirectory);
+            wire();
+            windows = new ProtectWindow(this);
+            getServer().getPluginManager().registerEvents(windows, this);
             command = new ProtectCommand(this);
             var commands = getServer().getCommandMap();
             var existing = commands.getCommand("protect");
+            var alias = commands.getCommand("ptc");
             if (existing != null && existing != command) {
-                getLogger().warning("/protect 已由其他插件註冊；請先停用該入口再重啟。此次不註冊替代指令。");
+                warn("log.commandTaken", "protect", ownerOf(existing));
                 command = null;
-            } else if (!commands.register("tokaProtect", command) || commands.getCommand("protect") != command) {
-                getLogger().error("無法註冊指令 /protect；請檢查指令衝突。");
-                command = null;
+            } else {
+                // A taken alias is dropped before registering, so it can never replace or break the other plugin's command.
+                if (alias != null && alias != command) {
+                    warn("log.aliasTaken", "ptc", ownerOf(alias));
+                    command.setAliases(new String[0]);
+                }
+                if (!commands.register("tokaProtect", command) || commands.getCommand("protect") != command) {
+                    error("log.commandFailed");
+                    command = null;
+                }
             }
-        } catch (Exception | LinkageError error) {
-            getLogger().error("tokaProtect 未能載入；為避免以空資料覆蓋原資料，插件將停用。", error);
+        } catch (Exception | LinkageError failure) {
+            error("log.loadFailed", failure);
             getServer().getPluginManager().disablePlugin(this);
         }
     }
+
+    /** Builds everything that depends on config.yml and the stored flags: rules, breaker, logs and listeners. Undone by {@link #unwire()}. */
+    private void wire() {
+        var config = getConfig();
+        Path pluginDirectory = getDataFolder().toPath().toAbsolutePath().normalize();
+        mode = Mode.parse(config.getString("mode", "full"));
+        // Minimal mode never touches another plugin: it has no places to look in, so only world settings and defaults count.
+        Rules.Places lookup = mode.usesRegionsAndClaims() ? places : new Rules.Places() {
+            public String regionAt(String world, int x, int y, int z) { return null; }
+            public List<Rules.Claim> claimsAt(String world, int x, int y, int z) { return null; }
+        };
+        rules = new Rules(lookup, repository.load());
+        breaker = new Breaker(config.getInt("breaker.failures", 5), config.getInt("breaker.window-seconds", 60) * 1000L, System::currentTimeMillis);
+        EnumSet<Feature> chosen = EnumSet.noneOf(Feature.class);
+        for (Feature feature : Feature.values())
+            if (mode.allows(feature) && config.getBoolean("features." + feature.id(), true)) chosen.add(feature);
+        enabled = Collections.unmodifiableSet(chosen);
+        listen(new dev.toka.protect.listener.PlayerListener(config.getBoolean("player.keep-inventory", true), config.getBoolean("player.keep-experience", true), config.getBoolean("player.check-movement", false), config.getBoolean("player.auto-pickup", true)));
+        if (mode.enforces()) listen(new WorldListener(this, rules, breaker, enabled));
+        if (mode.enforces() && enabled.contains(Feature.FLIGHT))
+            listen(flight = new dev.toka.protect.listener.FlightListener(this, rules, breaker, config.getBoolean("flight.kick-illegal", false)));
+        if (mode.enforces() && enabled.contains(Feature.RECORD)) startLog(config, pluginDirectory);
+        if (mode.enforces() && enabled.contains(Feature.AUDIT)) startAudit(config, pluginDirectory);
+    }
+
+    private void listen(Listener listener) {
+        listeners.add(listener);
+        getServer().getPluginManager().registerEvents(listener, this);
+    }
+
+    /** Stops what {@link #wire()} started: listeners, writers, query threads and the log databases. */
+    private void unwire() {
+        listeners.forEach(HandlerList::unregisterAll);
+        listeners.clear();
+        if (flight != null) flight.release();
+        flight = null;
+        if (auditWriter != null) auditWriter.close();
+        auditWriter = null;
+        if (auditView != null) {
+            auditView.close();
+            try { auditView.store().close(); } catch (Exception failure) { error("log.auditCloseFailed", failure); }
+        }
+        auditView = null;
+        if (logWriter != null) logWriter.close();
+        logWriter = null;
+        if (rollback != null) rollback.close();
+        rollback = null;
+        if (logView != null) {
+            logView.close();
+            try { logView.store().close(); } catch (Exception failure) { error("log.recordCloseFailed", failure); }
+        }
+        logView = null;
+        inspector = null;
+    }
+
+    /** /protect reload: the config, the texts and everything built from them, then the flags are read from storage again. */
+    public void reloadSettings() {
+        unwire();
+        reloadConfig();
+        languages.clear();
+        wire();
+        if (command != null) command.refreshNames();
+        getServer().getOnlinePlayers().values().forEach(Player::sendCommandData);
+    }
+
+    /** The plugin that owns a command, for the log when a name is taken. */
+    private static String ownerOf(Command taken) {
+        return taken instanceof PluginCommand<?> owned ? owned.getPlugin().getName() : taken.getClass().getName();
+    }
+
+    public void info(String key, Object... args) { getLogger().info(text(getServer().getConsoleSender(), key, args)); }
+    public void warn(String key, Object... args) { getLogger().warning(text(getServer().getConsoleSender(), key, args)); }
+    public void error(String key, Object... args) { getLogger().error(text(getServer().getConsoleSender(), key, args)); }
+
+    /** An error line with its cause attached. */
+    public void error(String key, Throwable cause) { getLogger().error(text(getServer().getConsoleSender(), key), cause); }
 
     /** Opens the log database and starts writing. A failure here only turns the log off; the other features go on. */
     private void startLog(cn.nukkit.utils.Config config, Path pluginDirectory) {
@@ -120,23 +194,23 @@ public final class Main extends PluginBase implements Listener {
                 public void write(List<LogRecord> batch) throws Exception { logStore.insert(batch); }
                 public void maintain() throws Exception {
                     long removed = logStore.purge(System.currentTimeMillis() - retention, maxRows);
-                    if (removed > 0) getLogger().info("方塊紀錄已清除 " + removed + " 筆過期或超量的舊紀錄。");
+                    if (removed > 0) info("log.purged", removed);
                 }
             }, config.getInt("log.queue-size", 20_000), config.getInt("log.batch-size", 500), config.getInt("log.flush-seconds", 2) * 1000L,
-                    config.getInt("log.maintenance-minutes", 30) * 60_000L, error -> {
-                if (breaker.failed(Feature.RECORD, error)) getLogger().error("方塊紀錄寫入連續失敗，已自動停用；其他保護功能不受影響。", error);
-                else getLogger().warning("方塊紀錄寫入失敗，這一批已丟棄：" + error);
+                    config.getInt("log.maintenance-minutes", 30) * 60_000L, failure -> {
+                if (breaker.failed(Feature.RECORD, failure)) error("log.recordTripped", failure);
+                else warn("log.recordWriteFailed", failure);
             });
             logView = new LogView(this, logStore, config.getInt("log.query-rows", 300), config.getInt("log.collapse-seconds", 60) * 1000L);
             rollback = new dev.toka.protect.rollback.Rollback(this, logStore, config.getInt("rollback.max-rows", 200_000), config.getInt("rollback.max-blocks", 100_000),
                     config.getInt("rollback.blocks-per-tick", 200), config.getInt("rollback.confirm-seconds", 60) * 1000L);
             inspector = new Inspector(logView, null);
-            getServer().getPluginManager().registerEvents(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000),
-                    new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))), this);
-            getServer().getPluginManager().registerEvents(inspector, this);
-            getLogger().info("§b方塊紀錄就緒：保留 §a" + config.getInt("log.retention-days", 90) + " §b天、最多 §a" + dev.toka.protect.log.Num.group(maxRows) + " §b筆");
+            listen(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000),
+                    new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))));
+            listen(inspector);
+            info("log.recordReady", config.getInt("log.retention-days", 90), dev.toka.protect.log.Num.group(maxRows));
         } catch (Exception | LinkageError failure) {
-            getLogger().error("方塊紀錄無法啟動，已關閉；其他保護功能照常。", failure);
+            error("log.recordStartFailed", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
             without.addAll(enabled);
             without.remove(Feature.RECORD);
@@ -155,18 +229,18 @@ public final class Main extends PluginBase implements Listener {
             auditWriter = new LogWriter<>("audit", new LogWriter.Sink<AuditRecord>() {
                 public void write(List<AuditRecord> batch) throws Exception { store.insert(batch); }
                 public void maintain() throws Exception { store.purge(System.currentTimeMillis() - retention, maxRows); }
-            }, config.getInt("audit.queue-size", 5_000), 200, 2_000L, config.getInt("audit.maintenance-minutes", 30) * 60_000L, error -> {
-                if (breaker.failed(Feature.AUDIT, error)) getLogger().error("指令稽核寫入連續失敗，已自動停用；其他保護功能不受影響。", error);
-                else getLogger().warning("指令稽核寫入失敗，這一批已丟棄：" + error);
+            }, config.getInt("audit.queue-size", 5_000), 200, 2_000L, config.getInt("audit.maintenance-minutes", 30) * 60_000L, failure -> {
+                if (breaker.failed(Feature.AUDIT, failure)) error("log.auditTripped", failure);
+                else warn("log.auditWriteFailed", failure);
             });
             auditView = new AuditView(this, store, config.getInt("audit.query-rows", 300));
             java.util.Set<String> hidden = new java.util.HashSet<>();
             for (String name : config.getStringList("audit.hidden-commands")) hidden.add(name.toLowerCase(Locale.ROOT).replaceFirst("^/", ""));
-            getServer().getPluginManager().registerEvents(new AuditListener(this, auditWriter, breaker, hidden, config.getInt("audit.max-text", 256),
-                    new dev.toka.protect.link.DiscordSender(getServer()), config.getString("audit.discord-channel", "cmd"), config.getBoolean("audit.discord", false)), this);
-            getLogger().info("§b指令稽核就緒：保留 §a" + config.getInt("audit.retention-days", 30) + " §b天、最多 §a" + dev.toka.protect.log.Num.group(maxRows) + " §b筆");
+            listen(new AuditListener(this, auditWriter, breaker, hidden, config.getInt("audit.max-text", 256),
+                    new dev.toka.protect.link.DiscordSender(getServer()), config.getString("audit.discord-channel", "cmd"), config.getBoolean("audit.discord", false)));
+            info("log.auditReady", config.getInt("audit.retention-days", 30), dev.toka.protect.log.Num.group(maxRows));
         } catch (Exception | LinkageError failure) {
-            getLogger().error("指令稽核無法啟動，已關閉；其他保護功能照常。", failure);
+            error("log.auditStartFailed", failure);
             EnumSet<Feature> without = EnumSet.noneOf(Feature.class);
             without.addAll(enabled);
             without.remove(Feature.AUDIT);
@@ -187,19 +261,8 @@ public final class Main extends PluginBase implements Listener {
             command.unregister(commands);
         }
         if (instance == this) instance = null;
-        if (flight != null) flight.release();
-        if (auditWriter != null) auditWriter.close();
-        if (auditView != null) {
-            auditView.close();
-            try { auditView.store().close(); } catch (Exception error) { getLogger().error("關閉指令稽核資料庫失敗。", error); }
-        }
-        if (logWriter != null) logWriter.close();
-        if (rollback != null) rollback.close();
-        if (logView != null) {
-            logView.close();
-            try { logView.store().close(); } catch (Exception error) { getLogger().error("關閉方塊紀錄資料庫失敗。", error); }
-        }
-        if (store != null) try { store.close(); } catch (IOException error) { getLogger().error("關閉保護儲存庫失敗。", error); }
+        unwire();
+        if (store != null) try { store.close(); } catch (IOException failure) { error("log.storeCloseFailed", failure); }
     }
 
     /**
@@ -211,6 +274,8 @@ public final class Main extends PluginBase implements Listener {
         return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
     }
 
+    public ProtectCommand command() { return command; }
+    public ProtectWindow windows() { return windows; }
     public LogView logView() { return logView; }
     public dev.toka.protect.rollback.Rollback rollback() { return rollback; }
     public Inspector inspector() { return inspector; }
