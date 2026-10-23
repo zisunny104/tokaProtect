@@ -70,7 +70,7 @@ public final class Main extends PluginBase implements Listener {
             Backend backend = Backend.valueOf(config.getString("storage.backend", "SQLITE").strip().toUpperCase(Locale.ROOT));
             store = DocumentStore.open(new StoreConfig(backend, directory, config.getInt("storage.schema-version", 1)));
             repository = new FlagRepository(store);
-            mode = Mode.parse(config.getString("mode", "standby"));
+            mode = Mode.parse(config.getString("mode", "full"));
             // Minimal mode never touches another plugin: it has no places to look in, so only world settings and defaults count.
             places = new Places(getServer());
             Rules.Places lookup = mode.usesRegionsAndClaims() ? places : new Rules.Places() {
@@ -86,7 +86,7 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
             if (mode.enforces()) {
                 getServer().getPluginManager().registerEvents(new WorldListener(this, rules, breaker, enabled), this);
-                getLogger().warning("tokaProtect 已啟用（" + mode + "）：" + enabled + "。請確認 zero 的舊保護規則已停用，否則兩邊會同時攔截。");
+                getLogger().info("tokaProtect 已啟用（" + mode + "）：" + enabled + "。zero 會自己驗證並關掉它重複的舊保護。");
             } else {
                 getLogger().info("tokaProtect 待命中：mode 為 standby，不攔截任何事件。");
             }
@@ -211,6 +211,13 @@ public final class Main extends PluginBase implements Listener {
     public static boolean handlesPvp() {
         Main main = instance;
         return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
+    }
+
+    /** Whether a feature (by its id) is switched on and has not tripped. For zero's hand-over check, by reflection; false when not running. */
+    public static boolean runs(String featureId) {
+        Main main = instance;
+        if (main == null || main.breaker == null) return false;
+        return Feature.byId(featureId).filter(f -> main.enabled.contains(f) && main.breaker.working(f)).isPresent();
     }
 
     public LogView logView() { return logView; }
