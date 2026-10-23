@@ -59,7 +59,7 @@ flag:
   pvp: "Players may hurt each other (pvp claims allow it for themselves)"
   explosions: "Explosions may break blocks"
   farmland-trample: "Farmland may be trampled"
-  farmland-decay: "Farmland may dry out or be formed by the game"
+  farmland-decay: "Farmland may dry out or be formed by the game (no effect yet: the core fires no event for it)"
   unclaimed-liquids: "Water and lava may exist outside claims; when denied they are removed"
   unclaimed-fire: "Fire may exist outside claims; when denied it is removed"
   unclaimed-pistons: "Pistons may exist outside claims; when denied they are removed"

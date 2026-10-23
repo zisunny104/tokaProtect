@@ -96,6 +96,8 @@ public final class WorldListener implements Listener {
                 && !allowed(Feature.FARMLAND, Flag.FARMLAND_TRAMPLE, event.getBlock())) event.setCancelled();
     }
 
+    // The core dries farmland in its random tick and fires no event for it, so this only catches forms that do raise one.
+    // TODO: make farmland-decay work when the core offers an event (or a hook) for farmland drying out.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFarmlandForm(BlockFormEvent event) {
         if (event.getBlock() instanceof BlockFarmland && on(Feature.FARMLAND)

@@ -15,7 +15,10 @@ public enum Flag {
     EXPLOSIONS("explosions", false),
     /** Players and mobs may trample farmland into dirt. */
     FARMLAND_TRAMPLE("farmland-trample", false),
-    /** Farmland may dry out or be formed by the game. */
+    /**
+     * Farmland may dry out or be formed by the game. NOTE: no effect yet. The core dries farmland in its random tick without
+     * firing an event this plugin could cancel, so the flag is kept for when the core offers one (see WorldListener).
+     */
     FARMLAND_DECAY("farmland-decay", false),
     /** Water and lava may exist or flow outside any claim; when denied they are removed. */
     UNCLAIMED_LIQUIDS("unclaimed-liquids", true),
