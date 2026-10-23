@@ -211,19 +211,6 @@ public final class Main extends PluginBase implements Listener {
         return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
     }
 
-    /** Whether a feature (by its id) is switched on and has not tripped. For zero's hand-over check, by reflection; false when not running. */
-    public static boolean runs(String featureId) {
-        Main main = instance;
-        if (main == null || main.breaker == null) return false;
-        return Feature.byId(featureId).filter(f -> main.enabled.contains(f) && main.breaker.working(f)).isPresent();
-    }
-
-    /** Whether broken blocks drop into the inventory from here. For zero's hand-over check, by reflection. */
-    public static boolean handlesAutoPickup() {
-        Main main = instance;
-        return main != null && main.getConfig().getBoolean("player.auto-pickup", true);
-    }
-
     public LogView logView() { return logView; }
     public dev.toka.protect.rollback.Rollback rollback() { return rollback; }
     public Inspector inspector() { return inspector; }
