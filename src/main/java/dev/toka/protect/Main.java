@@ -233,7 +233,7 @@ public final class Main extends PluginBase implements Listener {
     public void save(FlagTable next) throws IOException { rules.table(repository.save(next)); }
 
     public String text(CommandSender sender, String key, Object... args) {
-        String tag = sender instanceof Player player ? player.getLocale().toLanguageTag() : getConfig().getString("language", "zh-TW");
+        String tag = sender instanceof Player player && player.getLocale() != null ? player.getLocale().toLanguageTag() : getConfig().getString("language", "zh-TW");
         String selected = tag.startsWith("en") ? "en-US" : "zh-TW";
         return languages.computeIfAbsent(selected, t -> new Messages(getClass().getClassLoader(), getDataFolder().toPath(), t, line -> getLogger().warning(line))).text(key, args);
     }
