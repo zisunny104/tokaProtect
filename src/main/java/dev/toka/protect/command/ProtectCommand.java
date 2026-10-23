@@ -124,7 +124,7 @@ public final class ProtectCommand extends Command {
 
     private void status(CommandSender sender) {
         int settings = plugin.rules().table().all().values().stream().mapToInt(Map::size).sum();
-        send(sender, "status", plugin.mode().name().toLowerCase(Locale.ROOT), settings,
+        send(sender, "status", plugin.mode().name().toLowerCase(Locale.ROOT), dev.toka.protect.log.Num.group(settings),
                 plugin.text(sender, plugin.places().hasRegions() ? "word.yes" : "word.no"), plugin.text(sender, plugin.places().hasClaims() ? "word.yes" : "word.no"));
         for (Feature feature : Feature.values()) {
             var state = plugin.breaker().state(feature);

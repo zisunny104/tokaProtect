@@ -77,7 +77,7 @@ public final class LogView implements AutoCloseable {
             try {
                 LogStore.Stats stats = store.stats();
                 String oldest = stats.oldest() == null ? "-" : new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date(stats.oldest()));
-                plugin.getServer().getScheduler().scheduleTask(plugin, () -> send(to, "log.stats", stats.rows(), oldest, stats.fileBytes() / 1024 / 1024));
+                plugin.getServer().getScheduler().scheduleTask(plugin, () -> send(to, "log.stats", Num.group(stats.rows()), oldest, Num.group(stats.fileBytes() / 1024 / 1024)));
             } catch (Exception failure) {
                 plugin.getServer().getScheduler().scheduleTask(plugin, () -> send(to, "cmd.failed", failure.getClass().getSimpleName()));
             }

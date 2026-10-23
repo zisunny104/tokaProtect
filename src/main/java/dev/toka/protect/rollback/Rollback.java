@@ -7,6 +7,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.scheduler.Task;
 import dev.toka.protect.Main;
 import dev.toka.protect.log.LogStore;
+import dev.toka.protect.log.Num;
 import dev.toka.protect.log.TileNbt;
 import java.util.HashMap;
 import java.util.List;
@@ -53,13 +54,13 @@ public final class Rollback implements AutoCloseable {
         worker.execute(() -> {
             try {
                 List<LogStore.Row> rows = store.find(withLimit(query), true);
-                if (rows.size() > maxRows) { later(() -> send(by, "rollback.tooManyRows", maxRows)); return; }
+                if (rows.size() > maxRows) { later(() -> send(by, "rollback.tooManyRows", Num.group(maxRows))); return; }
                 List<RollbackPlan.Entry> entries = RollbackPlan.build(rows);
-                if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", entries.size(), maxBlocks)); return; }
+                if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
                 later(() -> {
                     synchronized (pending) { pending.put(by.getName(), new Pending(entries, title, System.currentTimeMillis())); }
                     if (entries.isEmpty()) send(by, "rollback.nothing", title);
-                    else send(by, "rollback.preview", title, entries.size(), rows.size(), confirmMillis / 1000);
+                    else send(by, "rollback.preview", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
                 });
             } catch (Exception failure) {
                 plugin.getLogger().warning("還原預覽失敗：" + failure);
@@ -83,7 +84,7 @@ public final class Rollback implements AutoCloseable {
         synchronized (pending) { plan = pending.remove(by.getName()); }
         if (plan == null || System.currentTimeMillis() - plan.createdAt() > confirmMillis) { send(by, "rollback.noPlan"); return; }
         if (!running.compareAndSet(false, true)) { send(by, "rollback.running"); return; }
-        send(by, "rollback.started", plan.entries().size());
+        send(by, "rollback.started", Num.group(plan.entries().size()));
         plugin.getLogger().info("方塊還原開始：" + by.getName() + " " + plan.title() + "，" + plan.entries().size() + " 個位置");
         plugin.getServer().getScheduler().scheduleRepeatingTask(plugin, new Task() {
             private int at;
@@ -103,7 +104,7 @@ public final class Rollback implements AutoCloseable {
                 getHandler().cancel();
                 running.set(false);
                 plugin.getLogger().info("方塊還原結束：" + by.getName() + " 還原 " + restored + "、略過 " + skipped);
-                send(by, "rollback.done", restored, skipped);
+                send(by, "rollback.done", Num.group(restored), Num.group(skipped));
             }
         }, 1);
     }
