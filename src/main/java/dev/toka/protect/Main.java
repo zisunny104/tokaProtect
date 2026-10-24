@@ -85,20 +85,12 @@ public final class Main extends PluginBase implements Listener {
             command = new ProtectCommand(this);
             var commands = getServer().getCommandMap();
             var existing = commands.getCommand("protect");
-            var alias = commands.getCommand("ptc");
             if (existing != null && existing != command) {
-                warn("log.commandTaken", "protect", ownerOf(existing));
+                warn("log.commandTaken", ownerOf(existing));
                 command = null;
-            } else {
-                // A taken alias is dropped before registering, so it can never replace or break the other plugin's command.
-                if (alias != null && alias != command) {
-                    warn("log.aliasTaken", "ptc", ownerOf(alias));
-                    command.setAliases(new String[0]);
-                }
-                if (!commands.register("tokaProtect", command) || commands.getCommand("protect") != command) {
-                    error("log.commandFailed");
-                    command = null;
-                }
+            } else if (!commands.register("tokaProtect", command) || commands.getCommand("protect") != command) {
+                error("log.commandFailed");
+                command = null;
             }
         } catch (Exception | LinkageError failure) {
             error("log.loadFailed", failure);
@@ -107,7 +99,7 @@ public final class Main extends PluginBase implements Listener {
     }
 
     /** Builds everything that depends on config.yml and the stored flags: rules, breaker, logs and listeners. Undone by {@link #unwire()}. */
-    private void wire() {
+    private void wire() throws IOException {
         var config = getConfig();
         Path pluginDirectory = getDataFolder().toPath().toAbsolutePath().normalize();
         mode = Mode.parse(config.getString("mode", "full"));
@@ -161,7 +153,7 @@ public final class Main extends PluginBase implements Listener {
     }
 
     /** /protect reload: the config, the texts and everything built from them, then the flags are read from storage again. */
-    public void reloadSettings() {
+    public void reloadSettings() throws IOException {
         unwire();
         reloadConfig();
         languages.clear();
@@ -272,6 +264,11 @@ public final class Main extends PluginBase implements Listener {
     public static boolean handlesPvp() {
         Main main = instance;
         return main != null && main.enabled.contains(Feature.PVP) && main.breaker.working(Feature.PVP);
+    }
+
+    /** Administrators of the rules: the permission, an operator, or the identity administrator. */
+    public boolean isAdmin(CommandSender sender) {
+        return sender.hasPermission("tokaprotect.admin") || sender.isOp() || sender.hasPermission("toka.identity.admin");
     }
 
     public ProtectCommand command() { return command; }

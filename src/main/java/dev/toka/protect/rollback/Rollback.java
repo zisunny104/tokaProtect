@@ -48,7 +48,10 @@ public final class Rollback implements AutoCloseable {
     private void later(Runnable action) { plugin.getServer().getScheduler().scheduleTask(plugin, action); }
 
     /** Reads the log for the query in the background and keeps the resulting plan until it is confirmed or expires. */
-    public void preview(CommandSender by, LogStore.Query query, String title) {
+    public void preview(CommandSender by, LogStore.Query query, String title) { preview(by, query, title, null); }
+
+    /** Same, and when the plan has places to restore the chat preview is skipped and {@code ready} gets their number instead. */
+    public void preview(CommandSender by, LogStore.Query query, String title, java.util.function.IntConsumer ready) {
         if (running.get()) throw new IllegalArgumentException("ROLLBACK_RUNNING");
         send(by, "rollback.reading");
         worker.execute(() -> {
@@ -60,10 +63,11 @@ public final class Rollback implements AutoCloseable {
                 later(() -> {
                     synchronized (pending) { pending.put(by.getName(), new Pending(entries, title, System.currentTimeMillis())); }
                     if (entries.isEmpty()) send(by, "rollback.nothing", title);
+                    else if (ready != null) ready.accept(entries.size());
                     else send(by, "rollback.preview", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
                 });
             } catch (Exception failure) {
-                plugin.getLogger().warning("還原預覽失敗：" + failure);
+                plugin.warn("log.rollbackPreviewFailed", failure);
                 later(() -> send(by, "cmd.failed", failure.getClass().getSimpleName()));
             }
         });
@@ -85,7 +89,7 @@ public final class Rollback implements AutoCloseable {
         if (plan == null || System.currentTimeMillis() - plan.createdAt() > confirmMillis) { send(by, "rollback.noPlan"); return; }
         if (!running.compareAndSet(false, true)) { send(by, "rollback.running"); return; }
         send(by, "rollback.started", Num.group(plan.entries().size()));
-        plugin.getLogger().info("方塊還原開始：" + by.getName() + " " + plan.title() + "，" + plan.entries().size() + " 個位置");
+        plugin.info("log.rollbackStarted", by.getName(), plan.title(), plan.entries().size());
         plugin.getServer().getScheduler().scheduleRepeatingTask(plugin, new Task() {
             private int at;
             private int restored;
@@ -99,11 +103,11 @@ public final class Rollback implements AutoCloseable {
                     }
                     if (at < entries.size()) return;
                 } catch (RuntimeException | LinkageError failure) {
-                    plugin.getLogger().warning("方塊還原中斷：" + failure);
+                    plugin.warn("log.rollbackInterrupted", failure);
                 }
                 getHandler().cancel();
                 running.set(false);
-                plugin.getLogger().info("方塊還原結束：" + by.getName() + " 還原 " + restored + "、略過 " + skipped);
+                plugin.info("log.rollbackFinished", by.getName(), restored, skipped);
                 send(by, "rollback.done", Num.group(restored), Num.group(skipped));
             }
         }, 1);

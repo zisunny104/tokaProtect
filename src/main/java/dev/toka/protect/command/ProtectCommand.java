@@ -3,6 +3,7 @@ package dev.toka.protect.command;
 import cn.nukkit.Player;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
 import dev.toka.protect.Feature;
@@ -15,60 +16,74 @@ import java.util.*;
 public final class ProtectCommand extends Command {
     private static final String[] LAYERS = {"world", "region", "claim"};
     private static final String[] VALUES = {"allow", "deny", "inherit"};
+    /** Basics first; the topics for administrators follow, one page group each. */
+    public static final List<HelpPages.Section> SECTIONS = List.of(
+            new HelpPages.Section("read", null, List.of("flags", "info", "menu")),
+            new HelpPages.Section("flags", "tokaprotect.admin", List.of("status", "show", "set", "layers", "enforce", "reset", "reload", "permissions")),
+            new HelpPages.Section("log", "tokaprotect.admin", List.of("log", "logCheck", "logPlayer", "logCommands", "logStats")),
+            new HelpPages.Section("rollback", "tokaprotect.admin", List.of("rollback", "rollbackConfirm")));
     private final Main plugin;
     private final HelpPages help;
 
     public ProtectCommand(Main plugin) {
         super("protect", "全服保護", "/protect help");
         this.plugin = plugin;
-        setAliases(new String[]{"ptc"});
-        help = new HelpPages("protect", List.of(
-                new HelpPages.Section("read", null, List.of("flags", "info")),
-                new HelpPages.Section("flags", "tokaprotect.admin", List.of("status", "show", "set", "layers", "enforce", "reset")),
-                new HelpPages.Section("log", "tokaprotect.admin", List.of("log", "logCheck", "logPlayer", "logCommands", "logStats")),
-                new HelpPages.Section("rollback", "tokaprotect.admin", List.of("rollback"))), plugin::text);
+        help = new HelpPages("protect", SECTIONS, plugin::text);
         setPermission("tokaprotect.use;tokaprotect.admin");
+        refreshNames();
+    }
+
+    private static CommandParameter word(String id, boolean optional, String enumName, String... values) {
+        return CommandParameter.newEnum(id, optional, new CommandEnum(enumName, values));
+    }
+
+    /** Builds the Tab overloads again; the worlds offered are the ones loaded now. */
+    public void refreshNames() {
+        String[] worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName()).sorted().toArray(String[]::new);
+        CommandParameter world = worlds.length == 0 ? CommandParameter.newType("target", CommandParamType.STRING) : word("target", false, "TokaProtectWorld", worlds);
         getCommandParameters().clear();
-        addCommandParameters("read", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"flags", "info"})});
-        addCommandParameters("status", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status"})});
-        addCommandParameters("help", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"}),
-                CommandParameter.newEnum("section", true, new String[]{"read", "flags", "log", "rollback"}), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("log", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
-                CommandParameter.newEnum("what", new String[]{"here", "check", "stats"}), CommandParameter.newType("radius", true, CommandParamType.INT),
-                CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("logPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
-                CommandParameter.newEnum("what", new String[]{"player"}), CommandParameter.newType("name", CommandParamType.STRING),
-                CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("logCommands", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"log"}),
-                CommandParameter.newEnum("what", new String[]{"commands"}), CommandParameter.newType("name", true, CommandParamType.STRING),
-                CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("rollbackHere", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
-                CommandParameter.newEnum("what", new String[]{"here"}), CommandParameter.newType("radius", true, CommandParamType.INT),
-                CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackPlayer", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
-                CommandParameter.newEnum("what", new String[]{"player"}), CommandParameter.newType("name", CommandParamType.STRING),
-                CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackRun", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"rollback"}),
-                CommandParameter.newEnum("what", new String[]{"confirm", "cancel"})});
-        addCommandParameters("reset", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"reset"}),
+        addCommandParameters("read", new CommandParameter[]{word("action", false, "TokaProtectRead", "flags", "info", "status", "menu", "reload")});
+        addCommandParameters("help", new CommandParameter[]{word("action", false, "TokaProtectHelp", "help"), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("logHere", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogHere", "here"),
+                CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("logOther", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogOther", "check", "stats")});
+        addCommandParameters("logPlayer", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogPlayer", "player"),
+                CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("logCommands", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogCommands", "commands"),
+                CommandParameter.newType("name", true, CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
+        addCommandParameters("rollbackHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackHere", "here"),
+                CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackPlayer", "player"),
+                CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackRun", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackRun", "confirm", "cancel")});
+        addCommandParameters("reset", new CommandParameter[]{word("action", false, "TokaProtectReset", "reset"),
                 CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
-        addCommandParameters("show", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"show"}),
-                CommandParameter.newEnum("layer", LAYERS), CommandParameter.newType("target", CommandParamType.STRING)});
-        addCommandParameters("set", new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"set"}),
-                CommandParameter.newEnum("layer", LAYERS), CommandParameter.newType("target", CommandParamType.STRING),
-                CommandParameter.newEnum("flag", Arrays.stream(Flag.values()).map(Flag::id).toArray(String[]::new)),
-                CommandParameter.newEnum("value", VALUES), CommandParameter.newEnum("force", true, new String[]{"enforce"})});
+        String[] flagIds = Arrays.stream(Flag.values()).map(Flag::id).toArray(String[]::new);
+        addCommandParameters("showWorld", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerWorld", "world"), world});
+        addCommandParameters("showOther", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
+                CommandParameter.newType("target", CommandParamType.STRING)});
+        addCommandParameters("setWorld", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerWorld", "world"), world,
+                CommandParameter.newEnum("flag", flagIds), word("value", false, "TokaProtectValue", VALUES), word("force", true, "TokaProtectForce", "enforce")});
+        addCommandParameters("setOther", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
+                CommandParameter.newType("target", CommandParamType.STRING), CommandParameter.newEnum("flag", flagIds), word("value", false, "TokaProtectValue", VALUES),
+                word("force", true, "TokaProtectForce", "enforce")});
     }
 
     private void send(CommandSender sender, String key, Object... args) { sender.sendMessage(plugin.text(sender, key, args)); }
 
     @Override public boolean execute(CommandSender sender, String label, String[] args) {
         if (!testPermissionSilent(sender)) { send(sender, "cmd.denied"); return true; }
-        String action = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
+        String action = args.length == 0 ? (sender instanceof Player && plugin.isAdmin(sender) ? "menu" : "help") : args[0].toLowerCase(Locale.ROOT);
         try {
             switch (action) {
                 case "help" -> help.show(sender, args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0]);
                 case "flags" -> flags(sender);
+                case "menu" -> {
+                    admin(sender);
+                    if (!(sender instanceof Player player)) throw new IllegalArgumentException("PLAYER_ONLY");
+                    plugin.windows().open(player);
+                }
+                case "reload" -> { admin(sender); plugin.reloadSettings(); send(sender, "reload.done"); }
                 case "info" -> info(sender);
                 case "status" -> { admin(sender); status(sender); }
                 case "log" -> { admin(sender); log(sender, args); }
@@ -90,7 +105,7 @@ public final class ProtectCommand extends Command {
             "UNKNOWN_FLAG", "UNKNOWN_FEATURE", "LOG_PLAYER_UNKNOWN");
 
     /** The reason in words: known codes and number or id mistakes get a sentence, anything else is shown as it is. */
-    private String describe(CommandSender sender, Exception failure) {
+    public String describe(CommandSender sender, Exception failure) {
         String message = String.valueOf(failure.getMessage());
         if (CODES.contains(message)) return plugin.text(sender, "err." + message);
         if (failure instanceof NumberFormatException) return plugin.text(sender, "err.NUMBER");
@@ -101,7 +116,7 @@ public final class ProtectCommand extends Command {
     private String word(CommandSender sender, boolean allowed) { return plugin.text(sender, allowed ? "word.allow" : "word.deny"); }
 
     private void admin(CommandSender sender) {
-        if (!sender.hasPermission("tokaprotect.admin")) throw new SecurityException();
+        if (!plugin.isAdmin(sender)) throw new SecurityException();
     }
 
     private void flags(CommandSender sender) {
@@ -231,12 +246,13 @@ public final class ProtectCommand extends Command {
         };
         boolean enforce = args.length > 5 && args[5].equalsIgnoreCase("enforce");
         plugin.save(plugin.rules().table().with(layer, flag, new Setting(value, enforce && value != Setting.Value.INHERIT)));
-        plugin.getLogger().info("保護旗標：" + sender.getName() + " " + layer.kind() + " " + layer.id() + " " + flag.id() + " " + value + (enforce ? " enforce" : ""));
+        plugin.info("log.flag", sender.getName(), layer.kind().name().toLowerCase(Locale.ROOT), layer.id(), flag.id(), plugin.text(sender, "log.value." + value.name().toLowerCase(Locale.ROOT)),
+                enforce ? plugin.text(sender, "log.enforced") : "");
         send(sender, "done");
     }
 
     /** A world by its folder name, a region by name, or a claim by its id. */
-    private Layer layer(String kind, String target) {
+    public Layer layer(String kind, String target) {
         return switch (kind.toLowerCase(Locale.ROOT)) {
             case "world" -> {
                 if (plugin.getServer().getLevelByName(target) == null) throw new IllegalArgumentException("WORLD_UNKNOWN");

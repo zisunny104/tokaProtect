@@ -17,7 +17,7 @@ import cn.nukkit.event.player.PlayerBucketEmptyEvent;
 import cn.nukkit.event.player.PlayerBucketFillEvent;
 import cn.nukkit.item.ItemBucket;
 import cn.nukkit.level.Position;
-import cn.nukkit.plugin.Plugin;
+import dev.toka.protect.Main;
 import dev.toka.protect.Breaker;
 import dev.toka.protect.Feature;
 import dev.toka.protect.flag.Flag;
@@ -36,14 +36,14 @@ import java.util.Locale;
  * It never waits: records go to a queue that is written in the background.
  */
 public final class LogListener implements Listener {
-    private final Plugin plugin;
+    private final Main plugin;
     private final Rules rules;
     private final LogWriter<LogRecord> writer;
     private final Breaker breaker;
     private final int explosionLimit;
     private final TileNbt tiles;
 
-    public LogListener(Plugin plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit, TileNbt tiles) {
+    public LogListener(Main plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit, TileNbt tiles) {
         this.plugin = plugin;
         this.rules = rules;
         this.writer = writer;
@@ -63,8 +63,8 @@ public final class LogListener implements Listener {
     }
 
     private void failed(Throwable error) {
-        if (breaker.failed(Feature.RECORD, error)) plugin.getLogger().error("方塊紀錄連續出錯，已自動停用；其他保護功能不受影響。修正後用 /protect reset record 重新啟用。", error);
-        else plugin.getLogger().warning("方塊紀錄出錯，這筆未記錄：" + error);
+        if (breaker.failed(Feature.RECORD, error)) plugin.error("log.recordErrorTripped", error);
+        else plugin.warn("log.recordError", error);
     }
 
     private void write(Player player, Action action, Block block, int id, int meta, int prevId, int prevMeta, boolean keepTile) {

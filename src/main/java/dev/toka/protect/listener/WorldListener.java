@@ -22,7 +22,7 @@ import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.event.entity.EntityInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.level.Position;
-import cn.nukkit.plugin.Plugin;
+import dev.toka.protect.Main;
 import dev.toka.protect.Breaker;
 import dev.toka.protect.Feature;
 import dev.toka.protect.flag.Flag;
@@ -38,14 +38,14 @@ import java.util.Set;
  * block's class or the event) and only then ask the rules, which answer most flags without any lookup.
  */
 public final class WorldListener implements Listener {
-    private final Plugin plugin;
+    private final Main plugin;
     private final Rules rules;
     private final Breaker breaker;
     private final Set<Feature> enabled;
     /** Blocks already queued for removal this tick; updates arrive many times for the same block. */
     private final Set<Long> removing = new HashSet<>();
 
-    public WorldListener(Plugin plugin, Rules rules, Breaker breaker, Set<Feature> enabled) {
+    public WorldListener(Main plugin, Rules rules, Breaker breaker, Set<Feature> enabled) {
         this.plugin = plugin;
         this.rules = rules;
         this.breaker = breaker;
@@ -55,8 +55,8 @@ public final class WorldListener implements Listener {
     private boolean on(Feature feature) { return enabled.contains(feature) && breaker.working(feature); }
 
     private void failed(Feature feature, Throwable error) {
-        if (breaker.failed(feature, error)) plugin.getLogger().error("保護功能 " + feature.id() + " 連續出錯，已自動停用；其他功能不受影響。修正後用 /protect reset " + feature.id() + " 重新啟用。", error);
-        else plugin.getLogger().warning("保護功能 " + feature.id() + " 出錯，這次改用旗標預設值：" + error);
+        if (breaker.failed(feature, error)) plugin.error("log.featureTripped", feature.id(), error);
+        else plugin.warn("log.featureError", feature.id(), error);
     }
 
     /** The flag's value at the position, or its default if anything goes wrong. */

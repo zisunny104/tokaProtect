@@ -12,7 +12,7 @@ import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.event.player.PlayerToggleFlightEvent;
 import cn.nukkit.level.Location;
-import cn.nukkit.plugin.Plugin;
+import dev.toka.protect.Main;
 import dev.toka.protect.Breaker;
 import dev.toka.protect.Feature;
 import dev.toka.protect.flag.Flag;
@@ -34,7 +34,7 @@ public final class FlightListener implements Listener {
     public static final String BYPASS = "tokaprotect.fly.bypass";
     private static final long LANDING_MILLIS = 30_000L;
 
-    private final Plugin plugin;
+    private final Main plugin;
     private final Rules rules;
     private final Breaker breaker;
     private final boolean kickIllegal;
@@ -43,7 +43,7 @@ public final class FlightListener implements Listener {
     /** Players who lost flight in the air: their next fall damage is waived until the time shown. */
     private final Map<UUID, Long> landing = new HashMap<>();
 
-    public FlightListener(Plugin plugin, Rules rules, Breaker breaker, boolean kickIllegal) {
+    public FlightListener(Main plugin, Rules rules, Breaker breaker, boolean kickIllegal) {
         this.plugin = plugin;
         this.rules = rules;
         this.breaker = breaker;
@@ -60,7 +60,7 @@ public final class FlightListener implements Listener {
         try {
             return rules.allowed(Flag.FLY, at.getLevel().getFolderName(), at.getFloorX(), at.getFloorY(), at.getFloorZ());
         } catch (RuntimeException | LinkageError error) {
-            if (breaker.failed(Feature.FLIGHT, error)) plugin.getLogger().error("飛行功能連續出錯，已自動停用；其他保護功能不受影響。修正後用 /protect reset flight 重新啟用。", error);
+            if (breaker.failed(Feature.FLIGHT, error)) plugin.error("log.flightTripped", error);
             return Flag.FLY.defaultValue();
         }
     }
@@ -117,7 +117,7 @@ public final class FlightListener implements Listener {
         if (!breaker.working(Feature.FLIGHT)) return;
         event.setCancelled();
         if (kickIllegal) {
-            plugin.getLogger().warning("[保護] 檢測玩家 " + player.getName() + " 移動異常（飛行）");
+            plugin.warn("log.flightKick", player.getName());
             player.kick("[保護] 檢測移動異常");
         }
     }

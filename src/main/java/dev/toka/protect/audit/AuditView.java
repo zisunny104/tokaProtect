@@ -32,7 +32,7 @@ public final class AuditView implements AutoCloseable {
                 List<AuditStore.Row> rows = store.find(actor, since, maxRows);
                 plugin.getServer().getScheduler().scheduleTask(plugin, () -> render(to, title, rows, page));
             } catch (Exception failure) {
-                plugin.getLogger().warning("指令稽核查詢失敗：" + failure);
+                plugin.warn("log.auditQueryFailed", failure);
                 plugin.getServer().getScheduler().scheduleTask(plugin, () -> to.sendMessage(plugin.text(to, "cmd.failed", failure.getClass().getSimpleName())));
             }
         });

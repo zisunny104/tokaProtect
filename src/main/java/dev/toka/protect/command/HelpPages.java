@@ -1,11 +1,12 @@
 package dev.toka.protect.command;
 
 import cn.nukkit.command.CommandSender;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Help split into sections, each paged: "help" lists the sections the sender may see, "help <section> [page]" shows one.
- * Sections whose permission the sender lacks are hidden, so nobody reads about commands they cannot use.
+ * Chat help in pages: "/cmd help [page]". Page 1 is the basics everyone uses; every later page is one topic, introduced by a
+ * line saying what it is, and a topic the sender may not use is left out. A page that is not a number shows the first page.
  */
 public final class HelpPages {
     public interface Text { String of(CommandSender sender, String key, Object... args); }
@@ -24,28 +25,28 @@ public final class HelpPages {
         this.text = text;
     }
 
-    private List<Section> visible(CommandSender sender) {
-        return sections.stream().filter(s -> s.permission() == null || sender.hasPermission(s.permission())).toList();
+    /** Each page is the topic line and up to PER_PAGE command lines of one section. */
+    private List<List<String>> pages(CommandSender sender) {
+        List<List<String>> pages = new ArrayList<>();
+        for (Section section : sections) {
+            if (section.permission() != null && !sender.hasPermission(section.permission())) continue;
+            for (int from = 0; from < section.keys().size(); from += PER_PAGE) {
+                List<String> page = new ArrayList<>();
+                page.add(text.of(sender, "help.sec." + section.id()));
+                for (String key : section.keys().subList(from, Math.min(section.keys().size(), from + PER_PAGE))) page.add(text.of(sender, "help." + key));
+                pages.add(page);
+            }
+        }
+        return pages;
     }
 
     /** @param args what follows the word "help" */
     public void show(CommandSender sender, String[] args) {
-        List<Section> visible = visible(sender);
-        if (args.length == 0) {
-            sender.sendMessage(text.of(sender, "help.title", command));
-            for (Section section : visible) sender.sendMessage(text.of(sender, "help.index", command, section.id(), text.of(sender, "help.sec." + section.id()), section.keys().size()));
-            return;
-        }
-        Section found = visible.stream().filter(s -> s.id().equalsIgnoreCase(args[0])).findFirst().orElse(null);
-        if (found == null) { sender.sendMessage(text.of(sender, "help.unknown", args[0], command)); return; }
-        int pages = (found.keys().size() + PER_PAGE - 1) / PER_PAGE;
+        List<List<String>> pages = pages(sender);
         int page = 1;
-        if (args.length > 1) try { page = Math.min(Math.max(Integer.parseInt(args[1]), 1), pages); } catch (NumberFormatException ignored) { /* first page */ }
-        sender.sendMessage(text.of(sender, "help.section", text.of(sender, "help.sec." + found.id()), page, pages));
-        for (String key : found.keys().subList((page - 1) * PER_PAGE, Math.min(found.keys().size(), page * PER_PAGE))) sender.sendMessage(text.of(sender, "help." + key));
-        if (page < pages) sender.sendMessage(text.of(sender, "help.next", command, found.id(), page + 1));
+        if (args.length > 0) try { page = Math.min(Math.max(Integer.parseInt(args[0]), 1), pages.size()); } catch (NumberFormatException ignored) { /* first page */ }
+        sender.sendMessage(text.of(sender, "help.title", command, page, pages.size()));
+        pages.get(page - 1).forEach(sender::sendMessage);
+        if (page < pages.size()) sender.sendMessage(text.of(sender, "help.next", command, page + 1));
     }
-
-    /** Section ids the sender can open, for tab completion. */
-    public List<String> ids(CommandSender sender) { return visible(sender).stream().map(Section::id).toList(); }
 }

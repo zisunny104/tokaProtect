@@ -8,7 +8,7 @@ import cn.nukkit.event.block.SignChangeEvent;
 import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.event.server.RemoteServerCommandEvent;
 import cn.nukkit.event.server.ServerCommandEvent;
-import cn.nukkit.plugin.Plugin;
+import dev.toka.protect.Main;
 import cn.nukkit.utils.TextFormat;
 import dev.toka.protect.Breaker;
 import dev.toka.protect.Feature;
@@ -24,7 +24,7 @@ import java.util.Set;
  * and can pass each line to a Discord channel. It runs last and only notes what was typed; it never changes the outcome.
  */
 public final class AuditListener implements Listener {
-    private final Plugin plugin;
+    private final Main plugin;
     private final LogWriter<AuditRecord> writer;
     private final Breaker breaker;
     private final Set<String> hidden;
@@ -33,7 +33,7 @@ public final class AuditListener implements Listener {
     private final String channel;
     private final boolean relay;
 
-    public AuditListener(Plugin plugin, LogWriter<AuditRecord> writer, Breaker breaker, Set<String> hidden, int maxLength,
+    public AuditListener(Main plugin, LogWriter<AuditRecord> writer, Breaker breaker, Set<String> hidden, int maxLength,
                          DiscordSender discord, String channel, boolean relay) {
         this.plugin = plugin;
         this.writer = writer;
@@ -55,7 +55,7 @@ public final class AuditListener implements Listener {
                     level == null ? null : level.getFolderName(), player == null ? 0 : player.getFloorX(), player == null ? 0 : player.getFloorY(), player == null ? 0 : player.getFloorZ()));
             if (relay) discord.send("<" + TextFormat.clean(name) + (kind == AuditRecord.Kind.SIGN ? "|sign" : "") + "> " + TextFormat.clean(text), channel);
         } catch (RuntimeException | LinkageError error) {
-            if (breaker.failed(Feature.AUDIT, error)) plugin.getLogger().error("指令稽核連續出錯，已自動停用；其他保護功能不受影響。", error);
+            if (breaker.failed(Feature.AUDIT, error)) plugin.error("log.auditErrorTripped", error);
         }
     }
 

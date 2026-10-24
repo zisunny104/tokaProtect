@@ -42,10 +42,29 @@ public final class LogView implements AutoCloseable {
                 List<LogFormat.Line> lines = LogFormat.collapse(store.find(withLimit(query)), gapMillis);
                 plugin.getServer().getScheduler().scheduleTask(plugin, () -> render(to, title, lines, page));
             } catch (Exception failure) {
-                plugin.getLogger().warning("方塊紀錄查詢失敗：" + failure);
+                plugin.warn("log.queryFailed", failure);
                 plugin.getServer().getScheduler().scheduleTask(plugin, () -> send(to, "cmd.failed", failure.getClass().getSimpleName()));
             }
         });
+    }
+
+    /** The collapsed result lines, delivered on the server thread; null when the query failed. */
+    public void lines(LogStore.Query query, java.util.function.Consumer<List<LogFormat.Line>> done) {
+        worker.execute(() -> {
+            List<LogFormat.Line> lines = null;
+            try { lines = LogFormat.collapse(store.find(withLimit(query)), gapMillis); }
+            catch (Exception failure) { plugin.warn("log.queryFailed", failure); }
+            List<LogFormat.Line> result = lines;
+            plugin.getServer().getScheduler().scheduleTask(plugin, () -> done.accept(result));
+        });
+    }
+
+    /** One result line as text. */
+    public String format(CommandSender to, LogFormat.Line line) {
+        LogStore.Row row = line.newest();
+        String who = row.actor() != null ? row.actorName() : plugin.text(to, "log.cause", row.cause());
+        return plugin.text(to, "log.row", new SimpleDateFormat("MM-dd HH:mm").format(new Date(row.time())), who, plugin.text(to, row.action().langKey()), blockName(row.block(), row.meta()),
+                row.world() + " " + row.x() + "," + row.y() + "," + row.z(), line.count() > 1 ? plugin.text(to, "log.times", line.count()) : "");
     }
 
     private LogStore.Query withLimit(LogStore.Query q) {
