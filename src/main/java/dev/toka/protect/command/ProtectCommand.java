@@ -27,6 +27,7 @@ public final class ProtectCommand extends Command {
 
     public ProtectCommand(Main plugin) {
         super("protect", "全服保護", "/protect help");
+        setAliases(new String[]{"ptc"});
         this.plugin = plugin;
         help = new HelpPages("protect", SECTIONS, plugin::text);
         setPermission("tokaprotect.use;tokaprotect.admin");
