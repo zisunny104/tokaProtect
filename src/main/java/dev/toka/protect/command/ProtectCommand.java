@@ -40,7 +40,8 @@ public final class ProtectCommand extends Command {
 
     /** Builds the Tab overloads again; the worlds offered are the ones loaded now. */
     public void refreshNames() {
-        String[] worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName()).sorted().toArray(String[]::new);
+        // the client refuses a list with a capital letter in it (and crashes), so worlds are offered in lower case; the lookup ignores case
+        String[] worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName().toLowerCase(java.util.Locale.ROOT)).distinct().sorted().toArray(String[]::new);
         CommandParameter world = worlds.length == 0 ? CommandParameter.newType("target", CommandParamType.STRING) : word("target", false, "TokaProtectWorld", worlds);
         getCommandParameters().clear();
         addCommandParameters("read", new CommandParameter[]{word("action", false, "TokaProtectRead", "flags", "info", "status", "menu", "reload")});
