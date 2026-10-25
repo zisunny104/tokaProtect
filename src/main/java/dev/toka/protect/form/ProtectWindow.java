@@ -118,13 +118,14 @@ public final class ProtectWindow implements Listener {
         if (!admin(player)) return;
         List<String> worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName()).sorted().toList();
         FormWindowCustom window = new FormWindowCustom(t(player, "win.flags"));
+        window.addElement(new ElementHeader(t(player, "win.flags")));
         window.addElement(new ElementDropdown(t(player, "win.layerLabel"), List.of(t(player, "win.layerWorld"), t(player, "win.layerRegion"), t(player, "win.layerClaim")), 0));
         window.addElement(new ElementDropdown(t(player, "win.world"), worlds.isEmpty() ? List.of("-") : worlds, Math.max(0, worlds.indexOf(player.getLevel().getFolderName()))));
         window.addElement(new ElementInput(t(player, "win.target"), t(player, "win.targetHint")));
         show(player, window, event -> {
             if (event.wasClosed() || !(event.getResponse() instanceof FormResponseCustom response)) { open(player); return; }
-            String kind = LAYERS[response.getDropdownResponse(0).getElementID()];
-            String target = kind.equals("world") ? response.getDropdownResponse(1).getElementContent() : String.valueOf(response.getInputResponse(2)).strip();
+            String kind = LAYERS[response.getDropdownResponse(1).getElementID()];
+            String target = kind.equals("world") ? response.getDropdownResponse(2).getElementContent() : String.valueOf(response.getInputResponse(3)).strip();
             try {
                 flagValues(player, kind, target, command().layer(kind, target));
             } catch (IllegalArgumentException failure) {
@@ -233,10 +234,11 @@ public final class ProtectWindow implements Listener {
 
     private void search(Player player, LogStore.Query query, String title, List<LogFormat.Line> all, String needle) {
         FormWindowCustom window = new FormWindowCustom(t(player, "win.searchTitle"));
+        window.addElement(new ElementHeader(t(player, "win.searchTitle")));
         window.addElement(new ElementInput(t(player, "win.query"), t(player, "win.queryHint"), needle));
         show(player, window, event -> {
             if (event.wasClosed() || !(event.getResponse() instanceof FormResponseCustom response)) { page(player, query, title, all, needle, 1); return; }
-            String text = response.getInputResponse(0) == null ? "" : response.getInputResponse(0).strip();
+            String text = response.getInputResponse(1) == null ? "" : response.getInputResponse(1).strip();
             page(player, query, title, all, text.length() > 64 ? text.substring(0, 64) : text, 1);
         });
     }
