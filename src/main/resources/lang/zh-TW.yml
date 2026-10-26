@@ -197,4 +197,4 @@ win:
   rollbackThis: "還原這些變更"
   rollbackTitle: "還原 ${0}"
   rollbackBody: "將還原 ${0} 個位置。只還原方塊，不含箱子內容與告示牌文字。"
-  rollbackYes: "§b還原"
+  rollbackYes: "還原"

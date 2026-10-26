@@ -197,4 +197,4 @@ win:
   rollbackThis: "Roll these back"
   rollbackTitle: "Roll back ${0}"
   rollbackBody: "${0} places will be restored. Only blocks come back, not chest contents or sign text."
-  rollbackYes: "§bRoll back"
+  rollbackYes: "Roll back"
