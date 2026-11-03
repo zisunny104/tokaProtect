@@ -43,36 +43,38 @@ public final class ProtectCommand extends Command {
         // the client refuses a list with a capital letter in it (and crashes), so worlds are offered in lower case; the lookup ignores case
         String[] worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName().toLowerCase(java.util.Locale.ROOT)).distinct().sorted().toArray(String[]::new);
         CommandParameter world = worlds.length == 0 ? CommandParameter.newType("target", CommandParamType.STRING) : word("target", false, "TokaProtectWorld", worlds);
-        getCommandParameters().clear();
-        addCommandParameters("read", new CommandParameter[]{word("action", false, "TokaProtectRead", "flags", "info", "status", "menu", "reload")});
-        addCommandParameters("help", new CommandParameter[]{word("action", false, "TokaProtectHelp", "help"), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("logHere", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogHere", "here"),
+        // Built aside and swapped in whole: the network thread encodes the command list at any moment, and a half-built map would leave enum references dangling.
+        var rebuiltParams = new java.util.HashMap<String, cn.nukkit.command.data.CommandParameter[]>();
+        rebuiltParams.put("read", new CommandParameter[]{word("action", false, "TokaProtectRead", "flags", "info", "status", "menu", "reload")});
+        rebuiltParams.put("help", new CommandParameter[]{word("action", false, "TokaProtectHelp", "help"), CommandParameter.newType("page", true, CommandParamType.INT)});
+        rebuiltParams.put("logHere", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogHere", "here"),
                 CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("logOther", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogOther", "check", "stats")});
-        addCommandParameters("logPlayer", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogPlayer", "player"),
+        rebuiltParams.put("logOther", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogOther", "check", "stats")});
+        rebuiltParams.put("logPlayer", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogPlayer", "player"),
                 CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("logCommands", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogCommands", "commands"),
+        rebuiltParams.put("logCommands", new CommandParameter[]{word("action", false, "TokaProtectLog", "log"), word("what", false, "TokaProtectLogCommands", "commands"),
                 CommandParameter.newType("name", true, CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING), CommandParameter.newType("page", true, CommandParamType.INT)});
-        addCommandParameters("rollbackHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackHere", "here"),
+        rebuiltParams.put("rollbackHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackHere", "here"),
                 CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackPlayer", "player"),
+        rebuiltParams.put("rollbackPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackPlayer", "player"),
                 CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackItemsHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
+        rebuiltParams.put("rollbackItemsHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
                 word("where", false, "TokaProtectRollbackItemsHere", "here"), CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackItemsPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
+        rebuiltParams.put("rollbackItemsPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
                 word("where", false, "TokaProtectRollbackItemsPlayer", "player"), CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING)});
-        addCommandParameters("rollbackRun", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackRun", "confirm", "cancel")});
-        addCommandParameters("reset", new CommandParameter[]{word("action", false, "TokaProtectReset", "reset"),
+        rebuiltParams.put("rollbackRun", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackRun", "confirm", "cancel")});
+        rebuiltParams.put("reset", new CommandParameter[]{word("action", false, "TokaProtectReset", "reset"),
                 CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
         String[] flagIds = Arrays.stream(Flag.values()).map(Flag::id).toArray(String[]::new);
-        addCommandParameters("showWorld", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerWorld", "world"), world});
-        addCommandParameters("showOther", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
+        rebuiltParams.put("showWorld", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerWorld", "world"), world});
+        rebuiltParams.put("showOther", new CommandParameter[]{word("action", false, "TokaProtectShow", "show"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
                 CommandParameter.newType("target", CommandParamType.STRING)});
-        addCommandParameters("setWorld", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerWorld", "world"), world,
+        rebuiltParams.put("setWorld", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerWorld", "world"), world,
                 CommandParameter.newEnum("flag", flagIds), word("value", false, "TokaProtectValue", VALUES), word("force", true, "TokaProtectForce", "enforce")});
-        addCommandParameters("setOther", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
+        rebuiltParams.put("setOther", new CommandParameter[]{word("action", false, "TokaProtectSet", "set"), word("layer", false, "TokaProtectLayerOther", "region", "claim"),
                 CommandParameter.newType("target", CommandParamType.STRING), CommandParameter.newEnum("flag", flagIds), word("value", false, "TokaProtectValue", VALUES),
                 word("force", true, "TokaProtectForce", "enforce")});
+        setCommandParameters(rebuiltParams);
     }
 
     private void send(CommandSender sender, String key, Object... args) { sender.sendMessage(plugin.text(sender, key, args)); }
