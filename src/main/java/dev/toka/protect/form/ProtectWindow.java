@@ -182,6 +182,8 @@ public final class ProtectWindow implements Listener {
         window.addElement(new ElementSlider(t(player, "win.radius"), 0, 64, 1, 5));
         window.addElement(new ElementInput(t(player, "win.time"), "30m, 2h, 7d", "1d"));
         window.addElement(new ElementInput(t(player, "win.player"), t(player, "win.playerHint")));
+        // rollbacks can put back blocks or the contents of containers; the log has blocks only
+        if (rollback) window.addElement(new ElementDropdown(t(player, "win.what"), List.of(t(player, "win.whatBlocks"), t(player, "win.whatItems")), 0));
         show(player, window, event -> {
             if (event.wasClosed() || !(event.getResponse() instanceof FormResponseCustom response)) { open(player); return; }
             try {
@@ -192,8 +194,14 @@ public final class ProtectWindow implements Listener {
                 LogStore.Query query = who.isEmpty() ? LogStore.Query.at(world, player.getFloorX(), player.getFloorY(), player.getFloorZ(), radius, since, 0, 0)
                         : LogStore.Query.byPlayer(plugin.logView().player(who), since, 0, 0);
                 String title = who.isEmpty() ? world + " ±" + radius : who;
-                if (rollback) previewRollback(player, query, title); else results(player, query, title);
-            } catch (IllegalArgumentException failure) {
+                if (rollback && response.getDropdownResponse(4).getElementID() == 1) {
+                    var items = plugin.itemStore();
+                    if (items == null) throw new IllegalArgumentException("ITEMS_OFF");
+                    java.util.UUID actor = who.isEmpty() ? null : items.playerByName(who).orElseThrow(() -> new IllegalArgumentException("LOG_PLAYER_UNKNOWN"));
+                    previewItems(player, actor == null ? dev.toka.protect.log.ItemStore.Query.at(world, player.getFloorX(), player.getFloorY(), player.getFloorZ(), radius, since, 0)
+                            : dev.toka.protect.log.ItemStore.Query.byPlayer(actor, since, 0), title);
+                } else if (rollback) previewRollback(player, query, title); else results(player, query, title);
+            } catch (IllegalArgumentException | java.sql.SQLException failure) {
                 fail(player, failure);
             }
         });
@@ -254,9 +262,22 @@ public final class ProtectWindow implements Listener {
         }
     }
 
-    private void confirmRollback(Player player, String title, int count) {
+    private void previewItems(Player player, dev.toka.protect.log.ItemStore.Query query, String title) {
+        if (!admin(player)) return;
+        var rollback = plugin.rollback();
+        if (rollback == null) { player.sendMessage(t(player, "cmd.failed", t(player, "err.LOG_OFF"))); return; }
+        try {
+            rollback.previewItems(player, query, title, count -> confirmRollback(player, title, count, true));
+        } catch (IllegalArgumentException failure) {
+            fail(player, failure);
+        }
+    }
+
+    private void confirmRollback(Player player, String title, int count) { confirmRollback(player, title, count, false); }
+
+    private void confirmRollback(Player player, String title, int count, boolean items) {
         if (!player.isOnline() || !admin(player)) return;
-        show(player, new FormWindowModal(t(player, "win.rollbackTitle", title), t(player, "win.rollbackBody", Num.group(count)), t(player, "win.rollbackYes"), t(player, "win.cancel")), event -> {
+        show(player, new FormWindowModal(t(player, "win.rollbackTitle", title), t(player, items ? "win.rollbackBodyItems" : "win.rollbackBody", Num.group(count)), t(player, "win.rollbackYes"), t(player, "win.cancel")), event -> {
             if (!event.wasClosed() && event.getResponse() instanceof FormResponseModal response && response.getClickedButtonId() == 0) run(player, "rollback", "confirm");
             else run(player, "rollback", "cancel");
         });

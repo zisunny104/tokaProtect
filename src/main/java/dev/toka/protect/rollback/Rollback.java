@@ -80,7 +80,10 @@ public final class Rollback implements AutoCloseable {
 
 
     /** Same for container contents: reads the item log in the background and keeps the plan until it is confirmed or expires. */
-    public void previewItems(CommandSender by, ItemStore.Query query, String title) {
+    public void previewItems(CommandSender by, ItemStore.Query query, String title) { previewItems(by, query, title, null); }
+
+    /** Same, and when the plan has slots to restore the chat preview is skipped and {@code ready} gets their number instead. */
+    public void previewItems(CommandSender by, ItemStore.Query query, String title, java.util.function.IntConsumer ready) {
         if (itemStore == null) throw new IllegalArgumentException("ITEMS_OFF");
         if (running.get()) throw new IllegalArgumentException("ROLLBACK_RUNNING");
         send(by, "rollback.reading");
@@ -94,6 +97,7 @@ public final class Rollback implements AutoCloseable {
                 later(() -> {
                     synchronized (pending) { pending.put(by.getName(), new Pending(List.of(), entries, title, System.currentTimeMillis())); }
                     if (entries.isEmpty()) send(by, "rollback.nothing", title);
+                    else if (ready != null) ready.accept(entries.size());
                     else send(by, "rollback.previewItems", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
                 });
             } catch (Exception failure) {
