@@ -136,6 +136,7 @@ log:
     empty: "倒下"
     ignite: "點火"
     explode: "爆炸"
+    change: "變更"
 audit:
   row: "§7${0} §b${1} §8[${2}] §f${3}"
   kind:

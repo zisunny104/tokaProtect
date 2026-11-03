@@ -136,6 +136,7 @@ log:
     empty: "poured"
     ignite: "lit"
     explode: "exploded"
+    change: "changed"
 audit:
   row: "§7${0} §b${1} §8[${2}] §f${3}"
   kind:

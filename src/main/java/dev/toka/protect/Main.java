@@ -181,7 +181,7 @@ public final class Main extends PluginBase implements Listener {
             if (!file.startsWith(pluginDirectory)) throw new IllegalArgumentException("log.file must remain inside the plugin data folder");
             LogStore logStore = new LogStore(file);
             long retention = config.getInt("log.retention-days", 90) * 86_400_000L;
-            long maxRows = config.getLong("log.max-rows", 3_000_000L);
+            long maxRows = config.getLong("log.max-rows", 10_000_000L);
             logWriter = new LogWriter<>("log", new LogWriter.Sink<LogRecord>() {
                 public void write(List<LogRecord> batch) throws Exception { logStore.insert(batch); }
                 public void maintain() throws Exception {

@@ -14,6 +14,7 @@ import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.event.player.PlayerBucketEmptyEvent;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerBucketFillEvent;
 import cn.nukkit.item.ItemBucket;
 import cn.nukkit.level.Position;
@@ -106,6 +107,34 @@ public final class LogListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         Block block = event.getBlock();
         if (recording(block)) write(player, Action.IGNITE, block, BlockID.FIRE, 0, block.getId(), block.getDamage(), false);
+    }
+
+    /**
+     * A tool or item turns the clicked block into another one (an axe strips a log, a hoe tills, a shovel flattens, honeycomb waxes,
+     * dye colours). The core makes the change after this event, so the block is looked at again on the next tick and a change is
+     * written only when the block really differs. Only these items are watched, so ordinary clicks cost nothing.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getAction() != PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK) return;
+        var item = event.getItem();
+        if (item == null || !(item.isAxe() || item.isHoe() || item.isShovel() || item.getId() == cn.nukkit.item.ItemID.HONEYCOMB || item.getName().toLowerCase(Locale.ROOT).contains("dye"))) return;
+        Block block = event.getBlock();
+        if (block == null || block.getLevel() == null || !recording(block)) return;
+        Player player = event.getPlayer();
+        var level = block.getLevel();
+        int x = block.getFloorX(), y = block.getFloorY(), z = block.getFloorZ(), id = block.getId(), meta = block.getDamage();
+        byte[] tile = tiles.capture(block);
+        plugin.getServer().getScheduler().scheduleDelayedTask(plugin, () -> {
+            try {
+                Block now = level.getBlock(x, y, z);
+                if (now.getId() == id && now.getDamage() == meta) return;
+                writer.offer(LogRecord.byPlayer(System.currentTimeMillis(), player.getUniqueId(), player.getName(), Action.CHANGE,
+                        level.getFolderName(), x, y, z, now.getId(), now.getDamage(), id, meta, tile));
+            } catch (RuntimeException error) {
+                failed(error);
+            }
+        }, 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

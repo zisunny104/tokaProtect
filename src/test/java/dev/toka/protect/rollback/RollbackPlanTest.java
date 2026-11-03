@@ -45,6 +45,14 @@ public class RollbackPlanTest {
         assertEquals(3, plan.size());
     }
 
+    @Test public void aStrippedBlockIsPutBackAndExpectedToStayStripped() {
+        // row(time, action, x, block, prevBlock): the change leaves block, the previous block is what comes back
+        var plan = RollbackPlan.build(List.of(row(1, Action.CHANGE, 0, GLASS, STONE)));
+        assertEquals(1, plan.size());
+        assertEquals(STONE, plan.get(0).restoreId());
+        assertEquals(GLASS, plan.get(0).expectedId());
+    }
+
     @Test public void scoopedLiquidIsRestoredAndPouredLiquidIsRemoved() {
         var plan = RollbackPlan.build(List.of(row(1, Action.FILL, 0, 8, 8), row(2, Action.EMPTY, 1, 8, AIR)));
         assertEquals(8, plan.get(0).restoreId());

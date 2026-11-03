@@ -21,7 +21,7 @@ public final class RollbackPlan {
     /** What a change leaves behind: placed, poured and lit things stay; broken, scooped and blown-up things leave air. */
     static int[] after(LogStore.Row row) {
         return switch (row.action()) {
-            case PLACE, EMPTY, IGNITE -> new int[]{row.block(), row.meta()};
+            case PLACE, EMPTY, IGNITE, CHANGE -> new int[]{row.block(), row.meta()};
             case BREAK, FILL, EXPLODE -> new int[]{BlockID.AIR, 0};
         };
     }

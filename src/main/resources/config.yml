@@ -37,7 +37,7 @@ log:
   file: log/blocks.db
   # 保留天數與筆數上限，先到者先清，從最舊開始。
   retention-days: 90
-  max-rows: 3000000
+  max-rows: 10000000
   # 背景寫入：佇列滿了就丟棄並計數，不會拖慢伺服器。
   queue-size: 20000
   batch-size: 500

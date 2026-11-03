@@ -2,7 +2,9 @@ package dev.toka.protect.log;
 
 /** What happened to a block. The code is what is stored, so existing numbers must never change meaning. */
 public enum Action {
-    PLACE(0), BREAK(1), FILL(2), EMPTY(3), IGNITE(4), EXPLODE(5);
+    PLACE(0), BREAK(1), FILL(2), EMPTY(3), IGNITE(4), EXPLODE(5),
+    /** A block turned into another by a tool or an item: stripped, tilled, flattened, waxed, dyed. The previous block is what a rollback puts back. */
+    CHANGE(6);
 
     private final int code;
 
