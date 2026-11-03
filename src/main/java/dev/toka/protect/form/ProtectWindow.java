@@ -11,6 +11,7 @@ import cn.nukkit.form.element.ElementDivider;
 import cn.nukkit.form.element.ElementDropdown;
 import cn.nukkit.form.element.ElementHeader;
 import cn.nukkit.form.element.ElementInput;
+import cn.nukkit.form.element.ElementLabel;
 import cn.nukkit.form.element.ElementSlider;
 import cn.nukkit.form.element.ElementToggle;
 import cn.nukkit.form.response.FormResponseCustom;
@@ -134,42 +135,73 @@ public final class ProtectWindow implements Listener {
         });
     }
 
+    /** The flags in the order the window shows them, under a heading each. A flag missing here still appears, last, under "other". */
+    private static final Map<String, List<Flag>> GROUPS = Map.of(
+            "protect", List.of(Flag.PVP, Flag.EXPLOSIONS, Flag.FARMLAND_TRAMPLE, Flag.FARMLAND_DECAY, Flag.UNCLAIMED_LIQUIDS, Flag.UNCLAIMED_FIRE, Flag.UNCLAIMED_PISTONS, Flag.PISTON_CHESTS),
+            "movement", List.of(Flag.FLY),
+            "log", List.of(Flag.RECORD));
+    private static final List<String> GROUP_ORDER = List.of("protect", "movement", "log");
+
+    /**
+     * One switch per flag for allowed or not, and another for "follow the layer above". A switch has only two positions, so
+     * "inherit" needs its own; while it is on, the first switch is ignored. Nothing is written for a flag that did not change.
+     */
     private void flagValues(Player player, String kind, String target, Layer layer) {
         if (!admin(player)) return;
         FormWindowCustom window = new FormWindowCustom(t(player, "win.flagsOf", t(player, "layer." + kind, target)));
         window.addElement(new ElementHeader(t(player, "win.flagsHeader")));
-        List<Setting> current = new ArrayList<>();
-        int[] at = new int[Flag.values().length];
+        // flags added later that no group lists yet are not lost; they come last, under "other"
+        List<Flag> rest = new ArrayList<>(List.of(Flag.values()));
+        for (String group : GROUP_ORDER) rest.removeAll(GROUPS.get(group));
+        Map<Flag, int[]> places = new java.util.EnumMap<>(Flag.class);
+        Map<Flag, Setting> before = new java.util.EnumMap<>(Flag.class);
         int index = 1;
-        for (Flag flag : Flag.values()) {
-            Setting setting = plugin.rules().table().get(layer, flag).orElse(new Setting(Setting.Value.INHERIT, false));
-            current.add(setting);
-            ElementDropdown dropdown = new ElementDropdown(flag.id(), List.of(t(player, "win.value.allow"), t(player, "win.value.deny"), t(player, "win.value.inherit")),
-                    switch (setting.value()) { case ALLOW -> 0; case DENY -> 1; case INHERIT -> 2; });
-            dropdown.setTooltip(t(player, "flag." + flag.id()));
-            window.addElement(dropdown);
-            at[flag.ordinal()] = index++;
+        for (String group : GROUP_ORDER) {
+            window.addElement(new ElementDivider()); index++;
+            window.addElement(new ElementLabel(t(player, "win.group." + group))); index++;
+            for (Flag flag : GROUPS.get(group)) index = addFlag(player, window, layer, flag, places, before, index);
+        }
+        if (!rest.isEmpty()) {
+            window.addElement(new ElementDivider()); index++;
+            window.addElement(new ElementLabel(t(player, "win.group.other"))); index++;
+            for (Flag flag : rest) index = addFlag(player, window, layer, flag, places, before, index);
         }
         window.addElement(new ElementDivider());
-        int enforceAt = index;
+        int enforceAt = ++index;
         window.addElement(new ElementToggle(t(player, "win.enforce"), false));
         show(player, window, event -> {
             if (event.wasClosed() || !(event.getResponse() instanceof FormResponseCustom response)) { open(player); return; }
             boolean enforce = response.getToggleResponse(enforceAt);
             boolean changed = false;
-            for (Flag flag : Flag.values()) {
-                int chosen = response.getDropdownResponse(at[flag.ordinal()]).getElementID();
-                Setting before = current.get(flag.ordinal());
-                int old = switch (before.value()) { case ALLOW -> 0; case DENY -> 1; case INHERIT -> 2; };
-                boolean needsEnforce = enforce && chosen != 2 && !before.enforced();
-                if (chosen == old && !needsEnforce) continue;
-                if (enforce && chosen != 2) run(player, "set", kind, target, flag.id(), VALUES[chosen], "enforce");
-                else run(player, "set", kind, target, flag.id(), VALUES[chosen]);
+            for (Map.Entry<Flag, int[]> entry : places.entrySet()) {
+                Flag flag = entry.getKey();
+                boolean inherit = response.getToggleResponse(entry.getValue()[1]);
+                boolean allowed = response.getToggleResponse(entry.getValue()[0]);
+                Setting old = before.get(flag);
+                String chosen = inherit ? "inherit" : allowed ? "allow" : "deny";
+                String was = switch (old.value()) { case ALLOW -> "allow"; case DENY -> "deny"; case INHERIT -> "inherit"; };
+                boolean needsEnforce = enforce && !inherit && !old.enforced();
+                if (chosen.equals(was) && !needsEnforce) continue;
+                if (enforce && !inherit) run(player, "set", kind, target, flag.id(), chosen, "enforce");
+                else run(player, "set", kind, target, flag.id(), chosen);
                 changed = true;
             }
             if (!changed) player.sendMessage(t(player, "win.noChange"));
             open(player);
         });
+    }
+
+    /** Adds the two switches of one flag and remembers where they are; returns the next free element index. */
+    private int addFlag(Player player, FormWindowCustom window, Layer layer, Flag flag, Map<Flag, int[]> places, Map<Flag, Setting> before, int index) {
+        Setting setting = plugin.rules().table().get(layer, flag).orElse(new Setting(Setting.Value.INHERIT, false));
+        before.put(flag, setting);
+        boolean inherit = setting.value() == Setting.Value.INHERIT;
+        ElementToggle allowed = new ElementToggle(flag.id(), inherit ? flag.defaultValue() : setting.value() == Setting.Value.ALLOW);
+        allowed.setTooltip(t(player, "flag." + flag.id()));
+        window.addElement(allowed);
+        window.addElement(new ElementToggle(t(player, "win.inherit"), inherit));
+        places.put(flag, new int[]{index, index + 1});
+        return index + 2;
     }
 
     // ---- log and rollback ----

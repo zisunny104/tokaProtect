@@ -204,4 +204,10 @@ win:
   whatBlocks: "Blocks"
   whatItems: "Container items"
   rollbackBody: "${0} places will be restored. Only blocks and the sign text that is kept come back; choose Container items for chest contents."
+  group:
+    protect: "§lProtection"
+    movement: "§lMovement"
+    log: "§lLog"
+    other: "§lOther"
+  inherit: "Follow the layer above (while on, the switch above is ignored)"
   rollbackYes: "Roll back"

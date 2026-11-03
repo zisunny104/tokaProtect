@@ -204,4 +204,10 @@ win:
   what: "還原內容"
   whatBlocks: "方塊"
   whatItems: "箱子物品"
+  group:
+    protect: "§l保護"
+    movement: "§l行動"
+    log: "§l紀錄"
+    other: "§l其他"
+  inherit: "沿用上層（開啟時，上面的開關不算）"
   rollbackYes: "還原"
