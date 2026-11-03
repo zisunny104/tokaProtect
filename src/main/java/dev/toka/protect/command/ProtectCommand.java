@@ -89,7 +89,9 @@ public final class ProtectCommand extends Command {
                 case "menu" -> {
                     admin(sender);
                     if (!(sender instanceof Player player)) throw new IllegalArgumentException("PLAYER_ONLY");
-                    plugin.windows().open(player);
+                    if (args.length >= 3 && (args[1].equalsIgnoreCase("region") || args[1].equalsIgnoreCase("world")))
+                        plugin.windows().openFlags(player, args[1].toLowerCase(Locale.ROOT), String.join(" ", Arrays.copyOfRange(args, 2, args.length)));
+                    else plugin.windows().open(player);
                 }
                 case "reload" -> { admin(sender); plugin.reloadSettings(); send(sender, "reload.done"); }
                 case "info" -> info(sender);

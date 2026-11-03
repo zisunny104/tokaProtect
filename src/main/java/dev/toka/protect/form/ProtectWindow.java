@@ -115,6 +115,16 @@ public final class ProtectWindow implements Listener {
 
     // ---- flags ----
 
+    /** Straight to the switches of one region or world, for the windows of other plugins. */
+    public void openFlags(Player player, String kind, String target) {
+        if (!admin(player)) return;
+        try {
+            flagValues(player, kind, target, command().layer(kind, target));
+        } catch (IllegalArgumentException failure) {
+            fail(player, failure);
+        }
+    }
+
     private void flagTarget(Player player) {
         if (!admin(player)) return;
         List<String> worlds = plugin.getServer().getLevels().values().stream().map(l -> l.getFolderName()).sorted().toList();
