@@ -73,3 +73,13 @@ audit:
   discord: false
   discord-channel: cmd
   query-rows: 300
+
+# 箱子等容器的物品紀錄，存在獨立的檔案，保留時間比方塊紀錄短。
+# 記錄玩家在容器裡放入、取出的每一格，以及容器被破壞時裡面的物品，可用 /protect rollback items 還原。
+items:
+  enabled: true
+  file: log/items.db
+  retention-days: 14
+  max-rows: 2000000
+  # 單一物品的資料超過這個大小就不記（例如裝滿東西的界伏盒）。
+  max-item-bytes: 8192

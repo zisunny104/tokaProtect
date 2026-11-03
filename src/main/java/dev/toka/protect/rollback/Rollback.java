@@ -6,6 +6,8 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.scheduler.Task;
 import dev.toka.protect.Main;
+import dev.toka.protect.log.ItemCodec;
+import dev.toka.protect.log.ItemStore;
 import dev.toka.protect.log.LogStore;
 import dev.toka.protect.log.Num;
 import dev.toka.protect.log.TileNbt;
@@ -22,10 +24,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * left alone, and blocks come back with the tile data of the configured kinds (signs, heads, banners), not chest contents.
  */
 public final class Rollback implements AutoCloseable {
-    private record Pending(List<RollbackPlan.Entry> entries, String title, long createdAt) {}
+    private record Pending(List<RollbackPlan.Entry> entries, List<ItemPlan.Entry> items, String title, long createdAt) {}
 
     private final Main plugin;
     private final LogStore store;
+    /** Container contents; null when the item log is off. */
+    private final ItemStore itemStore;
     private final int maxRows;
     private final int maxBlocks;
     private final int perTick;
@@ -34,9 +38,10 @@ public final class Rollback implements AutoCloseable {
     private final AtomicBoolean running = new AtomicBoolean();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "tokaProtect-rollback"); t.setDaemon(true); return t; });
 
-    public Rollback(Main plugin, LogStore store, int maxRows, int maxBlocks, int perTick, long confirmMillis) {
+    public Rollback(Main plugin, LogStore store, ItemStore itemStore, int maxRows, int maxBlocks, int perTick, long confirmMillis) {
         this.plugin = plugin;
         this.store = store;
+        this.itemStore = itemStore;
         this.maxRows = maxRows;
         this.maxBlocks = maxBlocks;
         this.perTick = perTick;
@@ -61,10 +66,35 @@ public final class Rollback implements AutoCloseable {
                 List<RollbackPlan.Entry> entries = RollbackPlan.build(rows);
                 if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
                 later(() -> {
-                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, title, System.currentTimeMillis())); }
+                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, List.of(), title, System.currentTimeMillis())); }
                     if (entries.isEmpty()) send(by, "rollback.nothing", title);
                     else if (ready != null) ready.accept(entries.size());
                     else send(by, "rollback.preview", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
+                });
+            } catch (Exception failure) {
+                plugin.warn("log.rollbackPreviewFailed", failure);
+                later(() -> send(by, "cmd.failed", failure.getClass().getSimpleName()));
+            }
+        });
+    }
+
+
+    /** Same for container contents: reads the item log in the background and keeps the plan until it is confirmed or expires. */
+    public void previewItems(CommandSender by, ItemStore.Query query, String title) {
+        if (itemStore == null) throw new IllegalArgumentException("ITEMS_OFF");
+        if (running.get()) throw new IllegalArgumentException("ROLLBACK_RUNNING");
+        send(by, "rollback.reading");
+        worker.execute(() -> {
+            try {
+                List<dev.toka.protect.log.ItemStore.Row> rows = itemStore.find(new ItemStore.Query(query.world(), query.minX(), query.maxX(), query.minY(), query.maxY(),
+                        query.minZ(), query.maxZ(), query.actor(), query.since(), maxRows + 1));
+                if (rows.size() > maxRows) { later(() -> send(by, "rollback.tooManyRows", Num.group(maxRows))); return; }
+                List<ItemPlan.Entry> entries = ItemPlan.build(rows);
+                if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
+                later(() -> {
+                    synchronized (pending) { pending.put(by.getName(), new Pending(List.of(), entries, title, System.currentTimeMillis())); }
+                    if (entries.isEmpty()) send(by, "rollback.nothing", title);
+                    else send(by, "rollback.previewItems", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
                 });
             } catch (Exception failure) {
                 plugin.warn("log.rollbackPreviewFailed", failure);
@@ -88,8 +118,8 @@ public final class Rollback implements AutoCloseable {
         synchronized (pending) { plan = pending.remove(by.getName()); }
         if (plan == null || System.currentTimeMillis() - plan.createdAt() > confirmMillis) { send(by, "rollback.noPlan"); return; }
         if (!running.compareAndSet(false, true)) { send(by, "rollback.running"); return; }
-        send(by, "rollback.started", Num.group(plan.entries().size()));
-        plugin.info("log.rollbackStarted", by.getName(), plan.title(), plan.entries().size());
+        send(by, "rollback.started", Num.group(plan.entries().size() + plan.items().size()));
+        plugin.info("log.rollbackStarted", by.getName(), plan.title(), plan.entries().size() + plan.items().size());
         plugin.getServer().getScheduler().scheduleRepeatingTask(plugin, new Task() {
             private int at;
             private int restored;
@@ -98,10 +128,12 @@ public final class Rollback implements AutoCloseable {
             @Override public void onRun(int currentTick) {
                 try {
                     List<RollbackPlan.Entry> entries = plan.entries();
-                    for (int done = 0; done < perTick && at < entries.size(); done++, at++) {
-                        if (apply(entries.get(at))) restored++; else skipped++;
+                    List<ItemPlan.Entry> items = plan.items();
+                    for (int done = 0; done < perTick && at < entries.size() + items.size(); done++, at++) {
+                        boolean ok = at < entries.size() ? apply(entries.get(at)) : applyItem(items.get(at - entries.size()));
+                        if (ok) restored++; else skipped++;
                     }
-                    if (at < entries.size()) return;
+                    if (at < entries.size() + items.size()) return;
                 } catch (RuntimeException | LinkageError failure) {
                     plugin.warn("log.rollbackInterrupted", failure);
                 }
@@ -123,6 +155,36 @@ public final class Rollback implements AutoCloseable {
         level.setBlock(at, Block.get(entry.restoreId(), entry.restoreMeta()), false, true);
         TileNbt.restore(level, entry.x(), entry.y(), entry.z(), entry.restoreNbt());
         return true;
+    }
+
+
+    /** True when the slot got its old stack back; false when the container is gone, is not one, or the slot was used since the log. */
+    private boolean applyItem(ItemPlan.Entry entry) {
+        Level level = plugin.getServer().getLevelByName(entry.world());
+        if (level == null) return false;
+        try {
+            Vector3 at = new Vector3(entry.x(), entry.y(), entry.z());
+            var tile = level.getBlockEntity(at);
+            if (tile == null) tile = rebuiltContainer(level, at);
+            cn.nukkit.inventory.Inventory inventory = tile instanceof cn.nukkit.blockentity.BlockEntityChest chest ? chest.getRealInventory()
+                    : tile instanceof cn.nukkit.inventory.InventoryHolder holder && tile instanceof cn.nukkit.blockentity.BlockEntityContainer ? holder.getInventory() : null;
+            if (inventory == null || entry.slot() < 0 || entry.slot() >= inventory.getSize()) return false;
+            if (!ItemCodec.same(entry.expected(), inventory.getItem(entry.slot()))) return false;
+            inventory.setItem(entry.slot(), ItemCodec.decode(entry.restore()));
+            return true;
+        } catch (java.io.IOException | RuntimeException unreadable) {
+            return false;
+        }
+    }
+
+    /** A container block that came back from a block rollback has no tile yet; make an empty one so the items have a place to go. */
+    private static cn.nukkit.blockentity.BlockEntity rebuiltContainer(Level level, Vector3 at) {
+        int id = level.getBlockIdAt(at.getFloorX(), at.getFloorY(), at.getFloorZ());
+        String type = id == cn.nukkit.block.BlockID.CHEST || id == cn.nukkit.block.BlockID.TRAPPED_CHEST ? cn.nukkit.blockentity.BlockEntity.CHEST
+                : id == cn.nukkit.block.BlockID.BARREL ? cn.nukkit.blockentity.BlockEntity.BARREL : null;
+        if (type == null) return null;
+        var chunk = level.getChunk(at.getFloorX() >> 4, at.getFloorZ() >> 4, true);
+        return cn.nukkit.blockentity.BlockEntity.createBlockEntity(type, chunk, cn.nukkit.blockentity.BlockEntity.getDefaultCompound(at, type));
     }
 
     @Override public void close() { worker.shutdown(); }

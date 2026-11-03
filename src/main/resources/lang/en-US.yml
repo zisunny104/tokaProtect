@@ -16,6 +16,7 @@ layer:
 err:
   USAGE: "Wrong usage; type /protect help."
   LOG_OFF: "The block log is not running."
+  ITEMS_OFF: "The container item log is not enabled."
   AUDIT_OFF: "The command audit is not running."
   PLAYER_ONLY: "Only a player in the game can use this command."
   RADIUS: "The radius must be between 0 and 64."
@@ -150,6 +151,7 @@ rollback:
   tooManyBlocks: "§c${0} places would change, over the limit of ${1}; use a shorter time or a smaller area."
   nothing: "§e${0}: nothing to restore."
   preview: "§e${0}: will restore §f${1} §eplaces (read ${2} rows). §7Within ${3}s type §e/protect rollback confirm §7to run, or cancel. Only blocks come back, not chest contents or sign text; spots changed since are skipped."
+  previewItems: "§e${0}: will restore §f${1} §econtainer slots (${2} records read). §7Enter §e/protect rollback confirm §7within ${3} s, or cancel. Items go back to their old slot only; slots used since are skipped; nothing is taken from whoever took them."
   noPlan: "§cNo rollback is waiting for confirmation, or it timed out. Preview again."
   running: "§cA rollback is already running; wait for it."
   started: "§eRestoring ${0} places…"

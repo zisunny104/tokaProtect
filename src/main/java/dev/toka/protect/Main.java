@@ -56,6 +56,8 @@ public final class Main extends PluginBase implements Listener {
     private Set<Feature> enabled = Set.of();
     private LogView logView;
     private LogWriter<LogRecord> logWriter;
+    private LogWriter<dev.toka.protect.log.ItemRecord> itemWriter;
+    private dev.toka.protect.log.ItemStore itemStore;
     private LogWriter<AuditRecord> auditWriter;
     private AuditView auditView;
     private Inspector inspector;
@@ -142,6 +144,10 @@ public final class Main extends PluginBase implements Listener {
         auditView = null;
         if (logWriter != null) logWriter.close();
         logWriter = null;
+        if (itemWriter != null) itemWriter.close();
+        itemWriter = null;
+        if (itemStore != null) try { itemStore.close(); } catch (Exception failure) { error("log.recordCloseFailed", failure); }
+        itemStore = null;
         if (rollback != null) rollback.close();
         rollback = null;
         if (logView != null) {
@@ -193,12 +199,29 @@ public final class Main extends PluginBase implements Listener {
                 if (breaker.failed(Feature.RECORD, failure)) error("log.recordTripped", failure);
                 else warn("log.recordWriteFailed", failure);
             });
+            if (config.getBoolean("items.enabled", true)) {
+                Path itemFile = pluginDirectory.resolve(config.getString("items.file", "log/items.db")).normalize();
+                if (!itemFile.startsWith(pluginDirectory)) throw new IllegalArgumentException("items.file must remain inside the plugin data folder");
+                dev.toka.protect.log.ItemStore items = new dev.toka.protect.log.ItemStore(itemFile);
+                itemStore = items;
+                long itemRetention = config.getInt("items.retention-days", 14) * 86_400_000L;
+                long itemMaxRows = config.getLong("items.max-rows", 2_000_000L);
+                itemWriter = new LogWriter<>("items", new LogWriter.Sink<dev.toka.protect.log.ItemRecord>() {
+                    public void write(List<dev.toka.protect.log.ItemRecord> batch) throws Exception { items.insert(batch); }
+                    public void maintain() throws Exception {
+                        long removed = items.purge(System.currentTimeMillis() - itemRetention, itemMaxRows);
+                        if (removed > 0) info("log.purged", removed);
+                    }
+                }, config.getInt("log.queue-size", 20_000), config.getInt("log.batch-size", 500), config.getInt("log.flush-seconds", 2) * 1000L,
+                        config.getInt("log.maintenance-minutes", 30) * 60_000L, failure -> warn("log.recordWriteFailed", failure));
+            }
             logView = new LogView(this, logStore, config.getInt("log.query-rows", 300), config.getInt("log.collapse-seconds", 60) * 1000L);
-            rollback = new dev.toka.protect.rollback.Rollback(this, logStore, config.getInt("rollback.max-rows", 200_000), config.getInt("rollback.max-blocks", 100_000),
+            rollback = new dev.toka.protect.rollback.Rollback(this, logStore, itemStore, config.getInt("rollback.max-rows", 200_000), config.getInt("rollback.max-blocks", 100_000),
                     config.getInt("rollback.blocks-per-tick", 200), config.getInt("rollback.confirm-seconds", 60) * 1000L);
             inspector = new Inspector(logView, null);
             listen(new LogListener(this, rules, logWriter, breaker, config.getInt("log.explosion-block-limit", 2000),
-                    new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048))));
+                    new dev.toka.protect.log.TileNbt(new java.util.HashSet<>(config.getStringList("log.tile-data")), config.getInt("log.tile-data-max-bytes", 2048)),
+                    itemWriter, config.getInt("items.max-item-bytes", 8192)));
             listen(inspector);
             info("log.recordReady", config.getInt("log.retention-days", 90), dev.toka.protect.log.Num.group(maxRows));
         } catch (Exception | LinkageError failure) {
@@ -274,6 +297,7 @@ public final class Main extends PluginBase implements Listener {
     public ProtectCommand command() { return command; }
     public ProtectWindow windows() { return windows; }
     public LogView logView() { return logView; }
+    public dev.toka.protect.log.ItemStore itemStore() { return itemStore; }
     public dev.toka.protect.rollback.Rollback rollback() { return rollback; }
     public Inspector inspector() { return inspector; }
     public LogWriter<LogRecord> logWriter() { return logWriter; }

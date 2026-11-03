@@ -57,6 +57,10 @@ public final class ProtectCommand extends Command {
                 CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING)});
         addCommandParameters("rollbackPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackPlayer", "player"),
                 CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackItemsHere", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
+                word("where", false, "TokaProtectRollbackItemsHere", "here"), CommandParameter.newType("radius", true, CommandParamType.INT), CommandParameter.newType("time", true, CommandParamType.STRING)});
+        addCommandParameters("rollbackItemsPlayer", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackItems", "items"),
+                word("where", false, "TokaProtectRollbackItemsPlayer", "player"), CommandParameter.newType("name", CommandParamType.STRING), CommandParameter.newType("time", true, CommandParamType.STRING)});
         addCommandParameters("rollbackRun", new CommandParameter[]{word("action", false, "TokaProtectRollback", "rollback"), word("what", false, "TokaProtectRollbackRun", "confirm", "cancel")});
         addCommandParameters("reset", new CommandParameter[]{word("action", false, "TokaProtectReset", "reset"),
                 CommandParameter.newEnum("feature", Arrays.stream(Feature.values()).map(Feature::id).toArray(String[]::new))});
@@ -104,7 +108,7 @@ public final class ProtectCommand extends Command {
     }
 
     private static final Set<String> CODES = Set.of("USAGE", "LOG_OFF", "AUDIT_OFF", "PLAYER_ONLY", "RADIUS", "ROLLBACK_RUNNING", "REGION_UNKNOWN", "WORLD_UNKNOWN",
-            "UNKNOWN_FLAG", "UNKNOWN_FEATURE", "LOG_PLAYER_UNKNOWN");
+            "UNKNOWN_FLAG", "UNKNOWN_FEATURE", "LOG_PLAYER_UNKNOWN", "ITEMS_OFF");
 
     /** The reason in words: known codes and number or id mistakes get a sentence, anything else is shown as it is. */
     public String describe(CommandSender sender, Exception failure) {
@@ -181,7 +185,7 @@ public final class ProtectCommand extends Command {
         }
     }
 
-    /** /protect rollback here [radius] [time] | player <name> [time] | confirm | cancel */
+    /** /protect rollback here [radius] [time] | player <name> [time] | items here [radius] [time] | items player <name> [time] | confirm | cancel */
     private void rollback(CommandSender sender, String[] args) {
         var rollback = plugin.rollback();
         if (rollback == null) throw new IllegalArgumentException("LOG_OFF");
@@ -189,6 +193,29 @@ public final class ProtectCommand extends Command {
         switch (need(args, 1).toLowerCase(Locale.ROOT)) {
             case "confirm" -> rollback.confirm(sender);
             case "cancel" -> rollback.cancel(sender);
+            case "items" -> {
+                var items = plugin.itemStore();
+                if (items == null) throw new IllegalArgumentException("ITEMS_OFF");
+                switch (need(args, 2).toLowerCase(Locale.ROOT)) {
+                    case "here" -> {
+                        Player player = view.requirePlayer(sender);
+                        int radius = args.length > 3 ? Integer.parseInt(args[3]) : 5;
+                        if (radius < 0 || radius > 64) throw new IllegalArgumentException("RADIUS");
+                        long span = args.length > 4 ? dev.toka.protect.log.TimeSpan.parseMillis(args[4]) : 86_400_000L;
+                        String world = player.getLevel().getFolderName();
+                        rollback.previewItems(sender, dev.toka.protect.log.ItemStore.Query.at(world, player.getFloorX(), player.getFloorY(), player.getFloorZ(),
+                                radius, System.currentTimeMillis() - span, 0), world + " ±" + radius);
+                    }
+                    case "player" -> {
+                        java.util.UUID who;
+                        try { who = items.playerByName(need(args, 3)).orElseThrow(() -> new IllegalArgumentException("LOG_PLAYER_UNKNOWN")); }
+                        catch (java.sql.SQLException failure) { throw new IllegalArgumentException(failure.getClass().getSimpleName()); }
+                        long span = args.length > 4 ? dev.toka.protect.log.TimeSpan.parseMillis(args[4]) : 86_400_000L;
+                        rollback.previewItems(sender, dev.toka.protect.log.ItemStore.Query.byPlayer(who, System.currentTimeMillis() - span, 0), args[3]);
+                    }
+                    default -> throw new IllegalArgumentException("USAGE");
+                }
+            }
             case "here" -> {
                 Player player = view.requirePlayer(sender);
                 int radius = args.length > 2 ? Integer.parseInt(args[2]) : 5;
