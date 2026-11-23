@@ -21,6 +21,7 @@ public final class ItemPlan {
         record Span(ItemStore.Row first, ItemStore.Row last) {}
         Map<String, Span> spans = new LinkedHashMap<>();
         for (ItemStore.Row row : oldestFirst) {
+            if (row.slot() < 0) continue;
             String key = row.world() + ':' + row.x() + ':' + row.y() + ':' + row.z() + ':' + row.slot();
             Span known = spans.get(key);
             spans.put(key, known == null ? new Span(row, row) : new Span(known.first(), row));
@@ -31,5 +32,26 @@ public final class ItemPlan {
             entries.add(new Entry(span.first().world(), span.first().x(), span.first().y(), span.first().z(), span.first().slot(), span.first().before(), span.last().after()));
         }
         return entries;
+    }
+
+    /** A stack a player picked up after it fell from the container at this spot. */
+    public record Pickup(String world, int x, int y, int z, java.util.UUID player, String name, byte[] stack) {}
+
+    /** Spots where a container was broken (rows with the spill marker), as "world:x:y:z" keys. */
+    public static java.util.Set<String> spills(List<ItemStore.Row> rows) {
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (ItemStore.Row row : rows) if (row.slot() == dev.toka.protect.log.ItemRecord.SLOT_SPILL) keys.add(key(row.world(), row.x(), row.y(), row.z()));
+        return keys;
+    }
+
+    public static String key(String world, int x, int y, int z) { return world + ':' + x + ':' + y + ':' + z; }
+
+    public static List<Pickup> pickups(List<ItemStore.Row> rows) {
+        List<Pickup> found = new ArrayList<>();
+        for (ItemStore.Row row : rows) {
+            if (row.slot() == dev.toka.protect.log.ItemRecord.SLOT_PICKUP && row.before() != null)
+                found.add(new Pickup(row.world(), row.x(), row.y(), row.z(), row.actor(), row.actorName(), row.before()));
+        }
+        return found;
     }
 }

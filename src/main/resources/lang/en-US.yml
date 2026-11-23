@@ -150,6 +150,7 @@ rollback:
   reading: "§7Reading the log…"
   tooManyRows: "§cMore than ${0} log rows match; use a shorter time or a smaller area."
   tooManyBlocks: "§c${0} places would change, over the limit of ${1}; use a shorter time or a smaller area."
+  takeBack: "§eConfirming takes back picked-up container items from these players (online only): ${0}"
   nothing: "§e${0}: nothing to restore."
   preview: "§e${0}: will restore §f${1} §eplaces (read ${2} rows). §7Within ${3}s type §e/protect rollback confirm §7to run, or cancel. Only blocks come back, not chest contents or sign text; spots changed since are skipped."
   previewItems: "§e${0}: will restore §f${1} §econtainer slots (${2} records read). §7Enter §e/protect rollback confirm §7within ${3} s, or cancel. Items go back to their old slot only; slots used since are skipped; nothing is taken from whoever took them."

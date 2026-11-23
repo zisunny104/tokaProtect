@@ -48,6 +48,7 @@ public final class LogListener implements Listener {
     /** Container slot changes; null when the item log is off. */
     private final LogWriter<ItemRecord> items;
     private final int itemBytes;
+    private final dev.toka.protect.log.Spills spills = new dev.toka.protect.log.Spills(120_000L);
 
     public LogListener(Main plugin, Rules rules, LogWriter<LogRecord> writer, Breaker breaker, int explosionLimit, TileNbt tiles, LogWriter<ItemRecord> items, int itemBytes) {
         this.plugin = plugin;
@@ -95,23 +96,59 @@ public final class LogListener implements Listener {
         Block block = event.getBlock();
         if (!recording(block)) return;
         write(event.getPlayer(), Action.BREAK, block, block.getId(), block.getDamage(), block.getId(), block.getDamage(), true);
-        spill(event.getPlayer(), block);
+        spill(event.getPlayer().getUniqueId(), event.getPlayer().getName(), block);
     }
 
-    /** A broken container: every stack inside is logged as taken out, so a rollback can fill the container again. */
-    private void spill(Player player, Block block) {
-        if (items == null) return;
+    private static boolean container(int id) {
+        return id == BlockID.CHEST || id == BlockID.TRAPPED_CHEST || id == BlockID.BARREL;
+    }
+
+    /**
+     * A broken container: every stack inside is logged as taken out, so a rollback can fill the container again, plus a marker
+     * row (slot -2) saying the stacks fell to the ground here. The stacks are also tracked for a short while so pickups nearby
+     * can be logged (slot -1) and taken back later.
+     */
+    private void spill(java.util.UUID actor, String actorName, Block block) {
+        if (items == null || !container(block.getId())) return;
         try {
             var tile = block.getLevel().getBlockEntity(new cn.nukkit.math.Vector3(block.getFloorX(), block.getFloorY(), block.getFloorZ()));
             cn.nukkit.inventory.Inventory inventory = tile instanceof cn.nukkit.blockentity.BlockEntityChest chest ? chest.getRealInventory()
                     : tile instanceof cn.nukkit.inventory.InventoryHolder holder && tile instanceof cn.nukkit.blockentity.BlockEntityContainer ? holder.getInventory() : null;
             if (inventory == null) return;
             long now = System.currentTimeMillis();
+            String world = block.getLevel().getFolderName();
+            int x = block.getFloorX(), y = block.getFloorY(), z = block.getFloorZ();
+            List<cn.nukkit.item.Item> fallen = new java.util.ArrayList<>();
             for (var entry : inventory.getContents().entrySet()) {
                 byte[] before = ItemCodec.encode(entry.getValue(), itemBytes);
-                if (before != null) items.offer(new ItemRecord(now, player.getUniqueId(), player.getName(), block.getLevel().getFolderName(),
-                        block.getFloorX(), block.getFloorY(), block.getFloorZ(), entry.getKey(), before, null));
+                if (before == null) continue;
+                items.offer(new ItemRecord(now, actor, actorName, world, x, y, z, entry.getKey(), before, null));
+                fallen.add(entry.getValue());
             }
+            if (fallen.isEmpty()) return;
+            items.offer(new ItemRecord(now, actor, actorName, world, x, y, z, ItemRecord.SLOT_SPILL, null, null));
+            spills.add(world, x, y, z, now, fallen);
+        } catch (java.io.IOException | RuntimeException error) {
+            failed(error);
+        }
+    }
+
+    /** A stack that fell from a broken container was picked up by a player nearby. Costs nothing while no container was just broken. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPickup(cn.nukkit.event.inventory.InventoryPickupItemEvent event) {
+        if (items == null) return;
+        long now = System.currentTimeMillis();
+        if (spills.isEmpty(now) || !(event.getInventory().getHolder() instanceof Player player)) return;
+        try {
+            var dropped = event.getItem();
+            var found = spills.take(dropped.getLevel().getFolderName(), dropped.x, dropped.y, dropped.z, dropped.getItem(), now);
+            if (found == null) return;
+            var taken = dropped.getItem().clone();
+            taken.setCount(found.count());
+            byte[] stack = ItemCodec.encode(taken, itemBytes);
+            if (stack == null) return;
+            var at = found.spill();
+            items.offer(new ItemRecord(now, player.getUniqueId(), player.getName(), at.world(), at.x(), at.y(), at.z(), ItemRecord.SLOT_PICKUP, stack, null));
         } catch (java.io.IOException | RuntimeException error) {
             failed(error);
         }
@@ -222,6 +259,7 @@ public final class LogListener implements Listener {
             for (Block block : blocks) {
                 if (written++ >= explosionLimit) break;
                 String world = block.getLevel().getFolderName();
+                if (container(block.getId())) spill(player != null ? player.getUniqueId() : ItemRecord.NOBODY, player != null ? player.getName() : cause, block);
                 writer.offer(player != null
                         ? LogRecord.byPlayer(now, player.getUniqueId(), player.getName(), Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage(), block.getId(), block.getDamage(), tiles.capture(block))
                         : LogRecord.byCause(now, cause, Action.EXPLODE, world, block.getFloorX(), block.getFloorY(), block.getFloorZ(), block.getId(), block.getDamage(), tiles.capture(block)));

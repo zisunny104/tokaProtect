@@ -24,7 +24,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * left alone, and blocks come back with the tile data of the configured kinds (signs, heads, banners), not chest contents.
  */
 public final class Rollback implements AutoCloseable {
-    private record Pending(List<RollbackPlan.Entry> entries, List<ItemPlan.Entry> items, String title, long createdAt) {}
+    private record Pending(List<RollbackPlan.Entry> entries, List<ItemPlan.Entry> items, java.util.Set<String> spills, List<ItemPlan.Pickup> pickups, String title, long createdAt) {}
+
+    /** What the item log says for a query: slots to refill, spots where containers broke, and pickups from those spills. */
+    private record ItemPart(List<ItemPlan.Entry> entries, java.util.Set<String> spills, List<ItemPlan.Pickup> pickups) {
+        static final ItemPart NONE = new ItemPart(List.of(), java.util.Set.of(), List.of());
+    }
+
+    /** A pickup still to be taken back, with how many of the stack are left to take. */
+    private static final class TakeBack {
+        final ItemPlan.Pickup pickup;
+        int left;
+        TakeBack(ItemPlan.Pickup pickup, int left) { this.pickup = pickup; this.left = left; }
+    }
 
     private final Main plugin;
     private final LogStore store;
@@ -66,20 +78,21 @@ public final class Rollback implements AutoCloseable {
                 List<RollbackPlan.Entry> entries = RollbackPlan.build(rows);
                 if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
                 // Container contents of the same area and window come back with the blocks; slots used since are left alone.
-                List<ItemPlan.Entry> items = List.of();
+                ItemPart part = ItemPart.NONE;
                 if (itemStore != null) {
                     List<ItemStore.Row> itemRows = itemStore.find(new ItemStore.Query(query.world(), query.minX(), query.maxX(), query.minY(), query.maxY(),
                             query.minZ(), query.maxZ(), query.actor(), query.since(), maxRows + 1));
-                    if (itemRows.size() <= maxRows) items = ItemPlan.build(itemRows);
-                    if (items.size() + entries.size() > maxBlocks) items = List.of();
+                    if (itemRows.size() <= maxRows) part = itemPart(itemRows);
+                    if (part.entries().size() + entries.size() > maxBlocks) part = ItemPart.NONE;
                 }
-                List<ItemPlan.Entry> itemEntries = items;
+                ItemPart itemPart = part;
                 later(() -> {
-                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, itemEntries, title, System.currentTimeMillis())); }
-                    int total = entries.size() + itemEntries.size();
+                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, itemPart.entries(), itemPart.spills(), itemPart.pickups(), title, System.currentTimeMillis())); }
+                    int total = entries.size() + itemPart.entries().size();
                     if (total == 0) send(by, "rollback.nothing", title);
                     else if (ready != null) ready.accept(total);
                     else send(by, "rollback.preview", title, Num.group(total), Num.group(rows.size()), confirmMillis / 1000);
+                    if (total > 0) tellTakeBack(by, itemPart.pickups());
                 });
             } catch (Exception failure) {
                 plugin.warn("log.rollbackPreviewFailed", failure);
@@ -102,19 +115,38 @@ public final class Rollback implements AutoCloseable {
                 List<dev.toka.protect.log.ItemStore.Row> rows = itemStore.find(new ItemStore.Query(query.world(), query.minX(), query.maxX(), query.minY(), query.maxY(),
                         query.minZ(), query.maxZ(), query.actor(), query.since(), maxRows + 1));
                 if (rows.size() > maxRows) { later(() -> send(by, "rollback.tooManyRows", Num.group(maxRows))); return; }
-                List<ItemPlan.Entry> entries = ItemPlan.build(rows);
+                ItemPart part = itemPart(rows);
+                List<ItemPlan.Entry> entries = part.entries();
                 if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
                 later(() -> {
-                    synchronized (pending) { pending.put(by.getName(), new Pending(List.of(), entries, title, System.currentTimeMillis())); }
+                    synchronized (pending) { pending.put(by.getName(), new Pending(List.of(), entries, part.spills(), part.pickups(), title, System.currentTimeMillis())); }
                     if (entries.isEmpty()) send(by, "rollback.nothing", title);
                     else if (ready != null) ready.accept(entries.size());
                     else send(by, "rollback.previewItems", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
+                    if (!entries.isEmpty()) tellTakeBack(by, part.pickups());
                 });
             } catch (Exception failure) {
                 plugin.warn("log.rollbackPreviewFailed", failure);
                 later(() -> send(by, "cmd.failed", failure.getClass().getSimpleName()));
             }
         });
+    }
+
+    private static ItemPart itemPart(List<ItemStore.Row> rows) {
+        return new ItemPart(ItemPlan.build(rows), ItemPlan.spills(rows), ItemPlan.pickups(rows));
+    }
+
+    /** Names who picked up fallen stacks and how many, so the admin knows what a confirmation will take back. */
+    private void tellTakeBack(CommandSender by, List<ItemPlan.Pickup> pickups) {
+        if (pickups.isEmpty()) return;
+        Map<String, Integer> perPlayer = new java.util.TreeMap<>();
+        for (ItemPlan.Pickup p : pickups) {
+            try { perPlayer.merge(p.name(), ItemCodec.decode(p.stack()).getCount(), Integer::sum); } catch (java.io.IOException | RuntimeException ignored) { /* unreadable stack */ }
+        }
+        if (perPlayer.isEmpty()) return;
+        StringBuilder who = new StringBuilder();
+        perPlayer.forEach((name, count) -> who.append(who.length() == 0 ? "" : ", ").append(name).append(" x").append(count));
+        send(by, "rollback.takeBack", who.toString());
     }
 
     private LogStore.Query withLimit(LogStore.Query q) {
@@ -138,13 +170,14 @@ public final class Rollback implements AutoCloseable {
             private int at;
             private int restored;
             private int skipped;
+            private final List<TakeBack> takeBacks = takeBacks(plan.pickups());
 
             @Override public void onRun(int currentTick) {
                 try {
                     List<RollbackPlan.Entry> entries = plan.entries();
                     List<ItemPlan.Entry> items = plan.items();
                     for (int done = 0; done < perTick && at < entries.size() + items.size(); done++, at++) {
-                        boolean ok = at < entries.size() ? apply(entries.get(at)) : applyItem(items.get(at - entries.size()));
+                        boolean ok = at < entries.size() ? apply(entries.get(at)) : applyItem(items.get(at - entries.size()), plan.spills(), takeBacks);
                         if (ok) restored++; else skipped++;
                     }
                     if (at < entries.size() + items.size()) return;
@@ -177,7 +210,7 @@ public final class Rollback implements AutoCloseable {
 
 
     /** True when the slot got its old stack back; false when the container is gone, is not one, or the slot was used since the log. */
-    private boolean applyItem(ItemPlan.Entry entry) {
+    private boolean applyItem(ItemPlan.Entry entry, java.util.Set<String> spills, List<TakeBack> takeBacks) {
         Level level = plugin.getServer().getLevelByName(entry.world());
         if (level == null) return false;
         try {
@@ -188,10 +221,53 @@ public final class Rollback implements AutoCloseable {
                     : tile instanceof cn.nukkit.inventory.InventoryHolder holder && tile instanceof cn.nukkit.blockentity.BlockEntityContainer ? holder.getInventory() : null;
             if (inventory == null || entry.slot() < 0 || entry.slot() >= inventory.getSize()) return false;
             if (!ItemCodec.same(entry.expected(), inventory.getItem(entry.slot()))) return false;
-            inventory.setItem(entry.slot(), ItemCodec.decode(entry.restore()));
+            var stack = ItemCodec.decode(entry.restore());
+            // A container that broke dropped these stacks; clear what is still lying around or was picked up so nothing doubles.
+            if (stack.getId() != 0 && spills.contains(ItemPlan.key(entry.world(), entry.x(), entry.y(), entry.z()))) reclaim(level, entry, stack, takeBacks);
+            inventory.setItem(entry.slot(), stack);
             return true;
         } catch (java.io.IOException | RuntimeException unreadable) {
             return false;
+        }
+    }
+
+    private static List<TakeBack> takeBacks(List<ItemPlan.Pickup> pickups) {
+        List<TakeBack> list = new java.util.ArrayList<>();
+        for (ItemPlan.Pickup p : pickups) {
+            try { list.add(new TakeBack(p, ItemCodec.decode(p.stack()).getCount())); } catch (java.io.IOException | RuntimeException ignored) { /* unreadable stack */ }
+        }
+        return list;
+    }
+
+    /** Removes the dropped copies of a stack near its container (up to its count), then takes the rest back from players who picked it up. */
+    private static void reclaim(Level level, ItemPlan.Entry entry, cn.nukkit.item.Item stack, List<TakeBack> takeBacks) throws java.io.IOException {
+        int left = stack.getCount();
+        var box = new cn.nukkit.math.SimpleAxisAlignedBB(entry.x() - 8, entry.y() - 8, entry.z() - 8, entry.x() + 9, entry.y() + 9, entry.z() + 9);
+        for (var near : level.getNearbyEntities(box)) {
+            if (left <= 0) break;
+            if (!(near instanceof cn.nukkit.entity.item.EntityItem dropped) || dropped.isClosed()) continue;
+            var lying = dropped.getItem();
+            if (lying == null || !lying.equals(stack, true, true)) continue;
+            int n = Math.min(left, lying.getCount());
+            left -= n;
+            if (n >= lying.getCount()) dropped.close(); else lying.setCount(lying.getCount() - n);
+        }
+        for (TakeBack back : takeBacks) {
+            if (left <= 0) break;
+            var p = back.pickup;
+            if (back.left <= 0 || !p.world().equals(entry.world()) || p.x() != entry.x() || p.y() != entry.y() || p.z() != entry.z()) continue;
+            var picked = ItemCodec.decode(p.stack());
+            if (!picked.equals(stack, true, true)) continue;
+            var player = level.getServer().getPlayer(p.player()).orElse(null);
+            if (player == null) continue;
+            int n = Math.min(left, back.left);
+            var take = picked.clone();
+            take.setCount(n);
+            var leftover = player.getInventory().removeItem(take);
+            int notRemoved = 0;
+            for (var item : leftover) notRemoved += item.getCount();
+            back.left -= n;
+            left -= Math.max(n - notRemoved, 0);
         }
     }
 

@@ -150,6 +150,7 @@ rollback:
   reading: "§7正在讀取紀錄…"
   tooManyRows: "§c符合的紀錄超過 ${0} 筆，請縮短時間或縮小範圍。"
   tooManyBlocks: "§c需要還原 ${0} 個位置，超過上限 ${1}，請縮短時間或縮小範圍。"
+  takeBack: "§e確認後將從下列玩家身上收回已撿走的箱內物品（僅限在線者）：${0}"
   nothing: "§e${0}：沒有需要還原的方塊。"
   preview: "§e${0}：將還原 §f${1} §e個位置（讀了 ${2} 筆紀錄）。§7${3} 秒內輸入 §e/protect rollback confirm §7執行，或 cancel 取消。只還原方塊與已設定保留的告示牌文字；箱子內容請用 rollback items；之後又被改過的位置會略過。"
   previewItems: "§e${0}：將還原 §f${1} §e格箱子物品（讀了 ${2} 筆紀錄）。§7${3} 秒內輸入 §e/protect rollback confirm §7執行，或 cancel 取消。物品只會放回原來的格子，已被別人使用過的格子會略過；不會從拿走的人身上收回。"

@@ -56,4 +56,12 @@ public class ItemPlanTest {
             assertEquals(0, store.count());
         }
     }
+
+    @Test public void markerAndPickupRowsAreNotSlotsButFeedTheCleanup() {
+        var rows = List.of(row(1, 0, DIAMOND, null), row(2, ItemRecord.SLOT_SPILL, null, null), row(3, ItemRecord.SLOT_PICKUP, DIAMOND, null));
+        assertEquals(1, ItemPlan.build(rows).size());
+        assertTrue(ItemPlan.spills(rows).contains(ItemPlan.key("world", 1, 2, 3)));
+        assertEquals(1, ItemPlan.pickups(rows).size());
+        assertEquals("thief", ItemPlan.pickups(rows).get(0).name());
+    }
 }
