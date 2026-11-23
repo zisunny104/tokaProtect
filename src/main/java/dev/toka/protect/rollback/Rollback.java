@@ -65,11 +65,21 @@ public final class Rollback implements AutoCloseable {
                 if (rows.size() > maxRows) { later(() -> send(by, "rollback.tooManyRows", Num.group(maxRows))); return; }
                 List<RollbackPlan.Entry> entries = RollbackPlan.build(rows);
                 if (entries.size() > maxBlocks) { later(() -> send(by, "rollback.tooManyBlocks", Num.group(entries.size()), Num.group(maxBlocks))); return; }
+                // Container contents of the same area and window come back with the blocks; slots used since are left alone.
+                List<ItemPlan.Entry> items = List.of();
+                if (itemStore != null) {
+                    List<ItemStore.Row> itemRows = itemStore.find(new ItemStore.Query(query.world(), query.minX(), query.maxX(), query.minY(), query.maxY(),
+                            query.minZ(), query.maxZ(), query.actor(), query.since(), maxRows + 1));
+                    if (itemRows.size() <= maxRows) items = ItemPlan.build(itemRows);
+                    if (items.size() + entries.size() > maxBlocks) items = List.of();
+                }
+                List<ItemPlan.Entry> itemEntries = items;
                 later(() -> {
-                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, List.of(), title, System.currentTimeMillis())); }
-                    if (entries.isEmpty()) send(by, "rollback.nothing", title);
-                    else if (ready != null) ready.accept(entries.size());
-                    else send(by, "rollback.preview", title, Num.group(entries.size()), Num.group(rows.size()), confirmMillis / 1000);
+                    synchronized (pending) { pending.put(by.getName(), new Pending(entries, itemEntries, title, System.currentTimeMillis())); }
+                    int total = entries.size() + itemEntries.size();
+                    if (total == 0) send(by, "rollback.nothing", title);
+                    else if (ready != null) ready.accept(total);
+                    else send(by, "rollback.preview", title, Num.group(total), Num.group(rows.size()), confirmMillis / 1000);
                 });
             } catch (Exception failure) {
                 plugin.warn("log.rollbackPreviewFailed", failure);
@@ -158,6 +168,10 @@ public final class Rollback implements AutoCloseable {
         if (now.getId() != entry.expectedId() || now.getDamage() != entry.expectedMeta()) return false;
         level.setBlock(at, Block.get(entry.restoreId(), entry.restoreMeta()), false, true);
         TileNbt.restore(level, entry.x(), entry.y(), entry.z(), entry.restoreNbt());
+        // A container without saved data still has to be a working one, so give it an empty tile (the item step fills it).
+        if (entry.restoreNbt() == null && level.getBlockEntity(at) == null) {
+            try { rebuiltContainer(level, at); } catch (RuntimeException ignored) { /* the block is back; it opens as a plain container later */ }
+        }
         return true;
     }
 

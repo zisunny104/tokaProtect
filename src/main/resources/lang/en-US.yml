@@ -204,7 +204,7 @@ win:
   what: "Restore"
   whatBlocks: "Blocks"
   whatItems: "Container items"
-  rollbackBody: "${0} places will be restored. Only blocks and the sign text that is kept come back; choose Container items for chest contents."
+  rollbackBody: "${0} places will be restored. Blocks, kept sign text and container items (back into their old slots) come back."
   group:
     protect: "§lProtection"
     movement: "§lMovement"
