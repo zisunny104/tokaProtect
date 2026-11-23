@@ -174,6 +174,14 @@ public final class Main extends PluginBase implements Listener {
     }
 
     public void info(String key, Object... args) { getLogger().info(text(getServer().getConsoleSender(), key, args)); }
+
+    /** A maintenance line: in the console, and in the Discord command channel (the record channel) when log.discord is on. */
+    private void maintenance(String key, Object... args) {
+        String line = text(getServer().getConsoleSender(), key, args);
+        getLogger().info(line);
+        if (getConfig().getBoolean("log.discord", true))
+            new dev.toka.protect.link.DiscordSender(getServer()).send(cn.nukkit.utils.TextFormat.clean("[tokaProtect] " + line), getConfig().getString("audit.discord-channel", "cmd"));
+    }
     public void warn(String key, Object... args) { getLogger().warning(text(getServer().getConsoleSender(), key, args)); }
     public void error(String key, Object... args) { getLogger().error(text(getServer().getConsoleSender(), key, args)); }
 
@@ -192,7 +200,7 @@ public final class Main extends PluginBase implements Listener {
                 public void write(List<LogRecord> batch) throws Exception { logStore.insert(batch); }
                 public void maintain() throws Exception {
                     long removed = logStore.purge(System.currentTimeMillis() - retention, maxRows);
-                    if (removed > 0) info("log.purged", removed);
+                    if (removed > 0) maintenance("log.purged", removed);
                 }
             }, config.getInt("log.queue-size", 20_000), config.getInt("log.batch-size", 500), config.getInt("log.flush-seconds", 2) * 1000L,
                     config.getInt("log.maintenance-minutes", 30) * 60_000L, failure -> {
@@ -210,7 +218,7 @@ public final class Main extends PluginBase implements Listener {
                     public void write(List<dev.toka.protect.log.ItemRecord> batch) throws Exception { items.insert(batch); }
                     public void maintain() throws Exception {
                         long removed = items.purge(System.currentTimeMillis() - itemRetention, itemMaxRows);
-                        if (removed > 0) info("log.purged", removed);
+                        if (removed > 0) maintenance("log.purgedItems", removed);
                     }
                 }, config.getInt("log.queue-size", 20_000), config.getInt("log.batch-size", 500), config.getInt("log.flush-seconds", 2) * 1000L,
                         config.getInt("log.maintenance-minutes", 30) * 60_000L, failure -> warn("log.recordWriteFailed", failure));

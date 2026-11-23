@@ -91,6 +91,7 @@ log:
   commandFailed: "§cCould not register the command §a/protect§c; check for a command clash"
   loadFailed: "§cThe protect plugin did not load and is disabled, so the saved data is not overwritten"
   purged: "§bBlock log: removed §a${0} §bold or surplus rows"
+  purgedItems: "§bItem log: removed §a${0} §bold or surplus rows"
   recordTripped: "§cBlock log writes keep failing; switched off. The other protections are not affected"
   recordWriteFailed: "§eBlock log write failed, this batch was dropped: §a${0}"
   recordReady: "§bBlock log ready: keeps §a${0} §bdays, at most §a${1} §brows"

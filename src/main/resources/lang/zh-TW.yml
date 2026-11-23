@@ -91,6 +91,7 @@ log:
   commandFailed: "§c無法註冊指令 §a/protect§c，請檢查指令衝突"
   loadFailed: "§c保護插件未能載入，為避免以空資料覆蓋原資料已停用"
   purged: "§b方塊紀錄已清除 §a${0} §b筆過期或超量的舊紀錄"
+  purgedItems: "§b物品紀錄已清除 §a${0} §b筆過期或超量的舊紀錄"
   recordTripped: "§c方塊紀錄寫入連續失敗，已自動停用；其他保護功能不受影響"
   recordWriteFailed: "§e方塊紀錄寫入失敗，這一批已丟棄：§a${0}"
   recordReady: "§b方塊紀錄就緒：保留 §a${0} §b天、最多 §a${1} §b筆"
